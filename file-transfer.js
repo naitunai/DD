@@ -9,6 +9,10 @@
   'use strict';
 
   const CHUNK_BYTES = 12 * 1024;
+  // [降内存] 流式写盘阈值：下载体积 >= 此值时走磁盘 sink（需 app 侧提供 context.openDownload），
+  // 避免整份文件的全部分块累积在 RAM 的 t.parts 里。原逻辑仅 >=100MB 才流式，1~100MB 的中等文件全部驻留内存。
+  // 这里把阈值下调到 8MB；想更省内存可继续调小。若 app 未实现 openDownload，download() 会自动退回 RAM 路径，功能不受影响。
+  const STREAM_MIN_BYTES = 8 * 1024 * 1024;
   const MAX_WINDOW = 128;
   const TIMEOUT_MS = 15000;
   const MAX_SENDERS = 3;
@@ -21,7 +25,8 @@
 
   function strategyFor(size) {
     if (size < 1024 * 1024) return { name: 'small', initialWindow: 8, maxWindow: 8, stream: false, ackEvery: 1 };
-    if (size < 100 * 1024 * 1024) return { name: 'medium', initialWindow: 32, maxWindow: 32, stream: false, ackEvery: 4 };
+    // [降内存] 原上界 100*1024*1024：超过 8MB 即归入 large 走流式写盘，RAM 峰值从“整份文件”降到“窗口级缓冲(~384KB)”
+    if (size < STREAM_MIN_BYTES) return { name: 'medium', initialWindow: 32, maxWindow: 32, stream: false, ackEvery: 4 };
     return { name: 'large', initialWindow: 32, maxWindow: MAX_WINDOW, stream: true, ackEvery: 8 };
   }
 
@@ -88,9 +93,11 @@
       states.delete(k);
       states.set(k, { state, progress, message });
       // Status is disposable UI state; it must not grow with indefinite chat history.
+      // [防状态堆积] 一次性删到上限为止（原实现每轮 change 只删 1 条，突发涌入时会滞后）；仍跳过正在下载的连接
       if (states.size > MAX_STATES) {
         for (const old of states.keys()) {
-          if (!receivers.has(old)) { states.delete(old); break; }
+          if (states.size <= MAX_STATES) break;
+          if (!receivers.has(old)) states.delete(old);
         }
       }
       if (typeof context.onChange === 'function') context.onChange(sid, cid, mid);
