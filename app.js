@@ -1875,7 +1875,14 @@
       (br ? `&bitrate=${br}` : '') + (av.codec ? `&codec=${av.codec}` : '');
   }
 
-  function joinVoice(sid, cid, withCam) {
+  // [最小化冻结] 向桌面壳上报“当前是否有活跃媒体（在语音/摄像头/屏幕共享中）”。
+// 网页版无监听者时为无害空操作；Electron 端由 desktop-preload 转发给主进程，
+// 主进程据此决定最小化时能否安全节流（通话/共享中绝不节流，避免对端卡帧）。
+function reportMediaActive(active) {
+  try { window.dispatchEvent(new CustomEvent('dischord-media-active', { detail: { active: !!active } })); } catch (_) { }
+}
+
+function joinVoice(sid, cid, withCam) {
     const s = server(sid), c = channel(s, cid);
     if (!s || !c || c.type !== 'voice') return;
     const rejoin = voice && voice.sid === sid && voice.cid === cid;
@@ -1888,7 +1895,7 @@
     if (!rejoin && !voiceOccupants(sid, cid).length) delete callStarts[sid + '/' + cid]; // nobody here: a new call begins now
     noteCallStart(sid, cid, now());
     const call = { sid, cid, iframe: f, cam: !!withCam, ss: false, vs, ssFrame: null, ssVs: vs + 's', timers: new Set(), since: rejoin && voice.since ? voice.since : now(), ...(keepShare || {}) };
-    voice = call;
+    voice = call; reportMediaActive(true);
     for (const k in sentVol) delete sentVol[k];
     f.addEventListener('load', () => {
       if (voice !== call) return;
@@ -1921,7 +1928,7 @@
     if (!voice) return;
     dropVoiceFrame();
     stopShare(true);
-    voice = null;
+    voice = null; reportMediaActive(false);
     focusUid = null;
     for (const k in speaking) delete speaking[k];
     broadcastState();
