@@ -15,7 +15,7 @@
     'Servers, text channels and voice/video rooms. Fully peer-to-peer, powered by VDO.Ninja. No accounts, no backend.': '服务器、文字频道、语音视频房间一应俱全。全程点对点直连，基于 VDO.Ninja，无需注册账号，不会上传你的数据。',
     // shell / nav
     'Open servers and channels': '打开服务器和频道', 'Channels': '频道', 'Back to call': '返回通话', 'User settings': '用户设置',
-    'Close navigation': '关闭导航', 'Direct messages': '私信', 'Direct Messages': '私信', 'Add a server': '添加服务器', 'Server options': '服务器选项',
+    'Close navigation': '关闭导航', '私信': '私信', '私信': '私信', 'Add a server': '添加服务器', 'Server options': '服务器选项',
     'Invite people': '邀请好友', 'Create text channel': '创建文字频道', 'Create voice channel': '创建语音频道', 'Rename server': '重命名服务器',
     'Leave server': '退出服务器', 'Voice Connected': '语音已连接', 'Time in this call': '本次通话时长', 'Disconnect': '断开连接',
     'Turn on camera': '开启摄像头', 'Turn off camera': '关闭摄像头', 'Video': '视频', 'Share your screen': '共享屏幕', 'Screen': '屏幕',
