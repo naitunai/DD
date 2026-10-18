@@ -5274,19 +5274,19 @@
   bgTimer.every(1200, hearCallChanges); // also in a background tab, where a call usually is
   bgTimer.every(PING_MS, broadcastState); // presence heartbeat, unaffected by background-tab throttling
   setInterval(() => {
+    if (document.hidden) return; // [省渲染] 后台标签页不刷整套侧栏/成员/面板；切回前台自然重绘
     renderTyping();
     if (cur.sid) renderPresence();
   }, 3000);
-  setInterval(paintSpeaking, 250);
-  setInterval(() => { paintCallTime(); paintChannelTimes(); }, 1000);
+  setInterval(() => { if (document.hidden || !voice) return; paintSpeaking(); }, 300); // [省渲染] 仅前台且身处语音频道才刷说话高亮，空闲不再每250ms全量遍历DOM
+  setInterval(() => { if (document.hidden) return; paintCallTime(); paintChannelTimes(); }, 1000); // [省渲染] 后台不再逐秒重写通话时长文本
   setInterval(pollStats, 2000);
   setInterval(() => applyVolumes(true), 4000);
   setInterval(pollRoutes, DIAG_STEP);
   // previews still missing in the channel on screen are asked for again from time to time
-  setInterval(() => { if (me && !document.hidden && document.querySelector('#messages img[data-img]:not([src])')) paintImages(); }, 15000);
+  setInterval(() => { if (me && !document.hidden && document.querySelector('#messages img[data-img]:not([src])')) paintImages(); }, 15000); // [省渲染] 已带前台+确有缺图守卫；下方无条件重复的第二个定时器已删除
   setInterval(announceViewers, 8000);
   document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd' && me) { e.preventDefault(); diagModal(); } });
-  setInterval(paintImages, 15000); // retry visible uncached previews when a provider returns
 
   // ---------------------------------------------------------------- boot
   function start() {
