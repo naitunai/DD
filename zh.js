@@ -15,7 +15,7 @@
     'Servers, text channels and voice/video rooms. Fully peer-to-peer, powered by VDO.Ninja. No accounts, no backend.': '服务器、文字频道、语音视频房间一应俱全。全程点对点直连，基于 VDO.Ninja，无需注册账号，不会上传你的数据。',
     // shell / nav
     'Open servers and channels': '打开服务器和频道', 'Channels': '频道', 'Back to call': '返回通话', 'User settings': '用户设置',
-    'Close navigation': '关闭导航', '私信': '私信', '私信': '私信', 'Add a server': '添加服务器', 'Server options': '服务器选项',
+    'Close navigation': '关闭导航', '私信': '私信', 'Add a server': '添加服务器', 'Server options': '服务器选项',
     'Invite people': '邀请好友', 'Create text channel': '创建文字频道', 'Create voice channel': '创建语音频道', 'Rename server': '重命名服务器',
     'Leave server': '退出服务器', 'Voice Connected': '语音已连接', 'Time in this call': '本次通话时长', 'Disconnect': '断开连接',
     'Turn on camera': '开启摄像头', 'Turn off camera': '关闭摄像头', 'Video': '视频', 'Share your screen': '共享屏幕', 'Screen': '屏幕',
@@ -129,7 +129,7 @@
     'Image is still loading. Try again in a moment.': '图片仍在加载，请稍后再试。', 'Could not save that image.': '无法保存该图片。',
     'Could not copy the image. Your browser may not allow it.': '无法复制图片，浏览器可能不允许。', "That invite link doesn't look right.": '邀请链接格式不正确。',
     'Open a text channel to mention someone.': '请先打开一个文字频道再提及成员。', 'Original message is no longer in local history.': '原消息已不在本地记录中。',
-    'Could not copy the report here.': '无法在此复制报告。', 'A newer version of 咚咚 is available. Reload the page to update.': 咚咚有新版本可用，刷新页面即可更新。',
+    'Could not copy the report here.': '无法在此复制报告。', 'A newer version of 咚咚 is available. Reload the page to update.': '咚咚有新版本可用，刷新页面即可更新。',
     'Update the Windows app to restart sharing with the same source automatically.': '请更新 Windows 客户端，以便自动使用同一画面源重新共享。',
     // file transfer
     'File transfer timed out. Try Download again.': '文件传输超时，请重新下载。', 'Download timed out. The sender may have disconnected.': '下载超时，发送方可能已断开。',
