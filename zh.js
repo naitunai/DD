@@ -1,4 +1,4 @@
-/* 叮咚 — Simplified Chinese UI layer.
+/* 咚咚 — Simplified Chinese UI layer.
  * A dictionary translator for every user-visible string the app renders: text nodes, the title /
  * placeholder / aria-label / alt attributes, <option> labels and the document title. It watches the
  * DOM with a MutationObserver, so menus, modals, toasts and stats that appear later are translated
@@ -11,8 +11,8 @@
   // ---------------------------------------------------------------- exact strings
   const D = {
     // brand
-    'Dischord': '叮咚', 'Welcome to Dischord': '欢迎来到叮咚', 'Welcome to 叮咚': '欢迎来到叮咚', 'Refresh 叮咚 to load screen-share controls.': '请刷新叮咚以加载屏幕共享控制。',
-    'Servers, text channels and voice/video rooms. Fully peer-to-peer, powered by VDO.Ninja. No accounts, no backend.': '服务器、文字频道、语音视频房间一应俱全。全程点对点直连，基于 VDO.Ninja，无需注册账号，也没有后端服务器。',
+    'Dischord': '咚咚', 'Welcome to Dischord': '欢迎来到咚咚', 'Welcome to 叮咚': '欢迎来到咚咚', 'Refresh 咚咚 to load screen-share controls.': '请刷新咚咚以加载屏幕共享控制。',
+    'Servers, text channels and voice/video rooms. Fully peer-to-peer, powered by VDO.Ninja. No accounts, no backend.': '服务器、文字频道、语音视频房间一应俱全。全程点对点直连，基于 VDO.Ninja，无需注册账号，不会上传你的数据。',
     // shell / nav
     'Open servers and channels': '打开服务器和频道', 'Channels': '频道', 'Back to call': '返回通话', 'User settings': '用户设置',
     'Close navigation': '关闭导航', 'Direct messages': '私信', 'Direct Messages': '私信', 'Add a server': '添加服务器', 'Server options': '服务器选项',
@@ -129,7 +129,7 @@
     'Image is still loading. Try again in a moment.': '图片仍在加载，请稍后再试。', 'Could not save that image.': '无法保存该图片。',
     'Could not copy the image. Your browser may not allow it.': '无法复制图片，浏览器可能不允许。', "That invite link doesn't look right.": '邀请链接格式不正确。',
     'Open a text channel to mention someone.': '请先打开一个文字频道再提及成员。', 'Original message is no longer in local history.': '原消息已不在本地记录中。',
-    'Could not copy the report here.': '无法在此复制报告。', 'A newer version of 叮咚 is available. Reload the page to update.': '叮咚有新版本可用，刷新页面即可更新。',
+    'Could not copy the report here.': '无法在此复制报告。', 'A newer version of 咚咚 is available. Reload the page to update.': 咚咚有新版本可用，刷新页面即可更新。',
     'Update the Windows app to restart sharing with the same source automatically.': '请更新 Windows 客户端，以便自动使用同一画面源重新共享。',
     // file transfer
     'File transfer timed out. Try Download again.': '文件传输超时，请重新下载。', 'Download timed out. The sender may have disconnected.': '下载超时，发送方可能已断开。',
@@ -182,7 +182,7 @@
     [/^Delete (#?)(.+) for everyone\?$/, '要为所有人删除 $1$2 吗？'], [/^Mention (.+)$/, '提及 $1'], [/^Removed (\d+) (person|people)$/, '已移除 $1 人'],
     [/^Removed (.+)$/, '已移除 $1'], [/^Removing (.+) from the call$/, '正在将 $1 移出通话'], [/^Moving (.+) to (.+)$/, '正在将 $1 移到 $2'],
     [/^(.+)'s app did not respond\. They may need to reload the page\.$/, '$1 的应用没有响应，对方可能需要刷新页面。'],
-    [/^(.+) is on an older version of 叮咚 and can't (.+) until they reload the page\.$/, '$1 使用的是旧版叮咚，刷新页面前无法执行该操作。'],
+    [/^(.+) is on an older version of 咚咚 and can't (.+) until they reload the page\.$/, '$1 使用的是旧版咚咚，刷新页面前无法执行该操作。'],
     [/^Remove (\d+) offline (person|people) from the member list\? Their messages stay, and anyone who comes back online is listed again\.$/, '要从成员列表中移除 $1 位离线成员吗？他们的消息会保留，重新上线后会再次显示。'],
     [/^Microphone: (.+)$/, '麦克风：$1'], [/^Output: (.+)$/, '输出：$1'], [/^Camera: (.+)$/, '摄像头：$1'], [/^Notifications: (.+)$/, '通知：$1'],
     [/^Expires (.+)\. Works while someone from this server is online\.$/, '$1 过期。服务器内有人在线时可用。'],
@@ -252,7 +252,7 @@
     let n;
     while ((n = tw.nextNode())) { if (n.nodeType === 3) fixText(n); else fixAttrs(n); }
   }
-  const fixTitle = () => { const t = document.title; const z = t.replace(/Dischord/g, '叮咚'); if (z !== t) document.title = z; };
+  const fixTitle = () => { const t = document.title; const z = t.replace(/Dischord/g, '咚咚'); if (z !== t) document.title = z; };
 
   const mo = new MutationObserver((list) => {
     for (const m of list) {
