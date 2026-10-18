@@ -11,7 +11,7 @@
   // ---------------------------------------------------------------- exact strings
   const D = {
     // brand
-    'Dischord': '咚咚', 'Welcome to Dischord': '欢迎来到咚咚', 'Welcome to 叮咚': '欢迎来到咚咚', 'Refresh 咚咚 to load screen-share controls.': '请刷新咚咚以加载屏幕共享控制。',
+    'Dischord': '咚咚', 'Welcome to Dischord': '欢迎来到咚咚', 'Welcome to 咚咚': '欢迎来到咚咚', 'Refresh 咚咚 to load screen-share controls.': '请刷新咚咚以加载屏幕共享控制。',
     'Servers, text channels and voice/video rooms. Fully peer-to-peer, powered by VDO.Ninja. No accounts, no backend.': '服务器、文字频道、语音视频房间一应俱全。全程点对点直连，基于 VDO.Ninja，无需注册账号，不会上传你的数据。',
     // shell / nav
     'Open servers and channels': '打开服务器和频道', 'Channels': '频道', 'Back to call': '返回通话', 'User settings': '用户设置',
