@@ -1,4 +1,4 @@
-/* 叮咚 — a Discord-style app on top of VDO.Ninja. Fully peer-to-peer.
+/* 咚咚 — a Discord-style app on top of VDO.Ninja. Fully peer-to-peer.
  *
  * How it works (no backend):
  *  - Each server has a random id + secret key. Everyone who has the invite has both.
@@ -7,7 +7,7 @@
  *    voice-channel occupancy, channel changes and history sync, via the VDO.Ninja
  *    IFRAME API (sendData / dataReceived).
  *  - Voice channels are separate, visible VDO.Ninja rooms (audio, camera, screen share).
- *    叮咚 draws its own controls and drives VDO.Ninja through postMessage.
+ *    咚咚 draws its own controls and drives VDO.Ninja through postMessage.
  *  - Profiles, settings and chat metadata use localStorage. Image previews have a
  *    separate browser cache; original files transfer only after Download.
  *    History reaches people who join later as long as someone who has it is online.
@@ -212,7 +212,7 @@
   // Its packets go only to that person's connections, through any server we both have open (sendDm, dmPacket).
   const DM = 'dm';
   let dms = [];          // people I have a conversation with: { id, name, color, hid?: closed at }
-  const dmServer = { id: DM, name: 'Direct Messages', dm: true, v: 0, get channels() { return dms.filter((u) => !u.hid).map((u) => ({ id: u.id, name: u.name, type: 'text' })); } };
+  const dmServer = { id: DM, name: '私信', dm: true, v: 0, get channels() { return dms.filter((u) => !u.hid).map((u) => ({ id: u.id, name: u.name, type: 'text' })); } };
   const server = (sid) => (sid === DM ? dmServer : servers.find((s) => s.id === sid));
   const channel = (s, cid) => s && s.channels.find((c) => c.id === cid);
   const saveServers = () => store.set('servers', servers);
@@ -593,7 +593,7 @@
     m.ver = Number.isInteger(body.ver) && body.ver > 0 ? body.ver : 0; // 0 = a release from before versions were reported
     if (APP_VER && m.ver > APP_VER && !touch.toldNewer) {
       touch.toldNewer = true;
-      toast('A newer version of 叮咚 is available. Reload the page to update.', 10000);
+      toast('A newer version of 咚咚 is available. Reload the page to update.', 10000);
     }
     const vc = isId(body.vc) ? body.vc : null;
     if (vc) noteCallStart(sid, vc, Number.isFinite(body.vt) && body.vt >= 0 && body.vt < 30 * 864e5 ? now() - body.vt : now());
@@ -2234,7 +2234,7 @@
   function sendShareQuality(state, pending, operation) {
     if (!currentShareQuality(state) || state.pending !== pending) return;
     const bridge = window.DischordScreenQuality && window.DischordScreenQuality.bridge;
-    if (typeof bridge !== 'function') return finishShareQuality(state, { ok: false, error: 'Refresh 叮咚 to load screen-share controls.' });
+    if (typeof bridge !== 'function') return finishShareQuality(state, { ok: false, error: 'Refresh 咚咚 to load screen-share controls.' });
     pending.operation = operation;
     clearTimeout(pending.timer);
     pending.timer = setTimeout(() => {
@@ -2510,7 +2510,7 @@
     $('mobileChannels').setAttribute('aria-expanded', String(narrow && !!mobilePane));
     $('mobileChannels').setAttribute('aria-label', mobilePane ? 'Close navigation' : 'Open servers and channels');
     $('mobileChannelsLabel').textContent = mobilePane ? 'Close' : 'Channels';
-    $('mobileServerName').textContent = (server(cur.sid) || {}).name || '叮咚';
+    $('mobileServerName').textContent = (server(cur.sid) || {}).name || '咚咚';
     $('mobileCall').classList.toggle('hidden', !voice);
     // Drawers do not take focus or taps while they are offscreen; media keeps running.
     for (const id of ['rail', 'sidebar']) {
@@ -2682,12 +2682,12 @@
     $('homeBtn').classList.toggle('active', !cur.sid || cur.sid === DM);
     $('homeBtn').dataset.badge = total ? (total > 99 ? '99+' : total) : '';
     for (const s of servers) for (const c of s.channels) if (c.type === 'text') total += unreadCount(s.id, c.id);
-    document.title = (total ? `(${total}) ` : '') + '叮咚';
+    document.title = (total ? `(${total}) ` : '') + '咚咚';
   }
 
   function renderHeader() {
     const s = server(cur.sid);
-    $('serverName').textContent = s ? s.name : '叮咚';
+    $('serverName').textContent = s ? s.name : '咚咚';
     $('serverMenuBtn').classList.toggle('hidden', !s || !!s.dm);
     document.body.classList.toggle('dm-view', !!(s && s.dm));
   }
@@ -3262,7 +3262,7 @@
   const ctxSelect = (act, label, val, opts) => `<div class="ctx-select"><span>${label}</span><select data-sel="${act}">${opts.map(([v, l]) => `<option value="${v}" ${String(v) === String(val) ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
   const qOpts = (auto) => [[0, 'Auto' + (auto ? ' · ' + mbps(auto) : '')], ...VIEW_BRS.map((k) => [k, mbps(k)])];
 
-  // ---- device menus (the arrow beside, or a right-click on, the call buttons); all inside 叮咚
+  // ---- device menus (the arrow beside, or a right-click on, the call buttons); all inside 咚咚
   let devWait = null;
   const sameLabel = (a, b) => !!a && !!b && String(a).replace(/\W+/g, '_').toLowerCase() === String(b).replace(/\W+/g, '_').toLowerCase();
   const DEV = {
@@ -3530,7 +3530,7 @@
     const m = (members[sid] || {})[uid];
     if (!m) return;
     const name = m.user.name;
-    if (APP_VER && (m.ver || 0) < minVer) return toast(`${name} is on an older version of 叮咚 and can't ${what} until they reload the page.`, 8000);
+    if (APP_VER && (m.ver || 0) < minVer) return toast(`${name} is on an older version of 咚咚 and can't ${what} until they reload the page.`, 8000);
     send(sid, payload);
     toast(doing);
     setTimeout(() => {
@@ -4348,7 +4348,7 @@
 
   function profileModal(first) {
     const state = { color: (me && me.color) || COLORS[Math.floor(Math.random() * COLORS.length)] };
-    modal(`<h2>Welcome to 叮咚</h2>
+    modal(`<h2>Welcome to 咚咚</h2>
       <p>Pick a name and a colour. It's stored only in this browser.</p>
       ${profileEditor('', state.color)}
       <div class="actions"><button class="btn primary" id="mOk">Continue</button></div>`, () => {
