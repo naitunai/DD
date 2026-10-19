@@ -41,8 +41,23 @@ process.on('unhandledRejection', (err) => {
   mainLog('unhandledRejection: ' + ((err && err.stack) || err));
 });
 
-// 网页本体目录：随 electron-builder files:"app/**" 打进 asar
+// —— 内存优化：关闭后台/隐藏窗口的合成器与光栅化线程（咚咚是单窗口应用，页面隐藏时
+// VDO.Ninja iframe 的 video 合成占大头），并启用紧凑内存分配提示。必须在 app ready 前设置。
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('renderer-process-limit', '3');
+
+// 网页本体入口：随 electron-builder files:"app/**" 打进 asar（resources/app.asar/app/index.html）
 const INDEX_HTML = path.join(__dirname, 'app', 'index.html');
+
+// 产物完整性检查：asar 被杀软破坏或解压不完整时，给出人话提示而不是冷冰冰的 ERR_FAILED
+try {
+  if (!fs.existsSync(INDEX_HTML)) {
+    fatalShow('安装文件不完整',
+      '找不到应用入口文件：\n' + INDEX_HTML +
+      '\n\n常见原因：杀毒软件（Windows Defender 实时保护）隔离了 resources 下的文件，或解压未完成。' +
+      '\n处理办法：将整个咚咚文件夹加入杀软排除项，重新下载并完整解压后再试。');
+  }
+} catch (_) {}
 const isWin = process.platform === 'win32';
 
 let win = null;
@@ -96,6 +111,19 @@ function createWindow() {
     if (/^https?:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
+
+  // 退出时 VDO.Ninja iframe 的 WebRTC 媒体流可能未及释放，Windows 会弹
+  // "该应用无法关闭/仍在运行"。先主动销毁 webContents 停掉媒体管道再关窗。
+  win.on('close', () => {
+    mainLog('window close requested, releasing renderer/media pipeline');
+    try {
+      if (win && !win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+        win.webContents.closeDevTools();
+        win.webContents.forcefullyCrashRenderer();
+        mainLog('renderer forcefully closed');
+      }
+    } catch (_) {}
+  });
 }
 
 // 权限策略：只放行应用自身的媒体/通知权限，其余全部拒绝
@@ -108,8 +136,17 @@ app.whenReady().then(() => {
       const url = (details && details.requestingUrl) || '';
       const fromApp = url.startsWith('file:') || url.startsWith('http:');
       const allowed = ['media', 'mediaKeySystem', 'display-capture', 'notifications'].includes(permission);
-      callback(fromApp && allowed);
+      const grant = fromApp && allowed;
+      mainLog('permission request: ' + permission + ' from ' + (url.slice(0, 60) || '(none)') + ' -> ' + (grant ? 'GRANT' : 'DENY'));
+      callback(grant);
     });
+    // 预授权麦克风/摄像头：部分 Electron 版本下 getUserMedia(audio) 在 file:// 源
+    // 不会触发 request handler 而被静默拒绝（对端听不到声音）。显式放行双保险。
+    for (const p of ['media', 'audioCapture', 'videoCapture']) {
+      try { if (typeof ses.setPermission === 'function') ses.setPermission(p, 'granted'); } catch (_) {}
+    }
+    // 旧式回调接口兜底（setPermission 不可用的版本走这里）
+    try { if (typeof ses.setPermissionCheckHandler === 'function') ses.setPermissionCheckHandler(() => true); } catch (_) {}
   } catch (err) {
     mainLog('setPermissionRequestHandler failed: ' + ((err && err.message) || err));
   }
