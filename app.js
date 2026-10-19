@@ -19,7 +19,7 @@
 
   // Point this at a self-hosted VDO.Ninja if you like (see README).
   const VDO = (window.DISCHORD_CONFIG && window.DISCHORD_CONFIG.vdoUrl) || 'https://vdo.ninja/';
-  const PROTO = 2;
+  const PROTO = 3; // v3: text and voice channels are merged into one channel kind
   // The release this page is running, read from the ?v= on its own script tag. Everyone reports theirs,
   // so the app can say when someone is too out of date for a feature, or when a newer release exists.
   const APP_VER = +(((typeof document !== 'undefined' && document.currentScript && document.currentScript.src) || '').match(/[?&]v=(\d+)/) || [0, 0])[1];
@@ -208,11 +208,11 @@
   const fileProviders = new Map(); // offer -> originating connection, never saved in chat history
 
   // Direct messages: a private conversation with one person. It is kept as a pretend server ('dm') whose
-  // text channels are the people, so chat, replies, reactions, images and files all work the same way.
+  // channels are the people, so chat, replies, reactions, images, files and calls all work the same way.
   // Its packets go only to that person's connections, through any server we both have open (sendDm, dmPacket).
   const DM = 'dm';
   let dms = [];          // people I have a conversation with: { id, name, color, hid?: closed at }
-  const dmServer = { id: DM, name: '私信', dm: true, v: 0, get channels() { return dms.filter((u) => !u.hid).map((u) => ({ id: u.id, name: u.name, type: 'text' })); } };
+  const dmServer = { id: DM, name: '私信', dm: true, v: 0, get channels() { return dms.filter((u) => !u.hid).map((u) => ({ id: u.id, name: u.name })); } };
   const server = (sid) => (sid === DM ? dmServer : servers.find((s) => s.id === sid));
   const channel = (s, cid) => s && s.channels.find((c) => c.id === cid);
   const saveServers = () => store.set('servers', servers);
@@ -286,8 +286,9 @@
   }
   function cleanServerDef(d) {
     if (!d || !isId(d.id) || !isStr(d.name, 64) || !Array.isArray(d.channels) || typeof d.v !== 'number') return null;
-    const channels = d.channels.slice(0, 60).filter((c) => c && isId(c.id) && isStr(c.name, 40) && (c.type === 'text' || c.type === 'voice'))
-      .map((c) => ({ id: c.id, name: c.name, type: c.type }));
+    // Channels have no type any more (PROTO 3): every channel carries both messages and a call.
+    const channels = d.channels.slice(0, 60).filter((c) => c && isId(c.id) && isStr(c.name, 40))
+      .map((c) => ({ id: c.id, name: c.name }));
     const jc = d.jc && typeof d.jc === 'object' && typeof d.jc.c === 'string' && /^[a-z0-9]{8}$/.test(d.jc.c) && Number.isFinite(d.jc.x)
       ? { c: d.jc.c, x: Math.min(d.jc.x, now() + 31 * 864e5) } : undefined;
     return { id: d.id, name: d.name, channels, v: d.v, ...(jc ? { jc } : {}) };
@@ -713,7 +714,7 @@
         break;
       case 'move': {
         const dest = channel(s, p.cid);
-        if (p.to === me.id && dest && dest.type === 'voice' && voice && voice.sid === sid && voice.cid !== dest.id) {
+        if (p.to === me.id && dest && voice && voice.sid === sid && voice.cid !== dest.id) {
           toast(`${t.user.name} moved you to ${dest.name}`, 5000);
           joinVoice(sid, dest.id, voice.cam);
         }
@@ -744,7 +745,7 @@
     const d = cleanServerDef(def);
     const s = server(sid);
     if (!d || !s || d.id !== sid || d.v <= s.v) return;
-    const removed = s.channels.filter((c) => !d.channels.some((next) => next.id === c.id && next.type === c.type));
+    const removed = s.channels.filter((c) => !d.channels.some((next) => next.id === c.id));
     s.name = d.name; s.channels = d.channels; s.v = d.v;
     if (d.jc) s.jc = d.jc; else delete s.jc;
     removed.forEach((c) => releaseChannelFiles(sid, c.id));
@@ -752,7 +753,7 @@
     syncLobbies();
     if (voice && voice.sid === sid && !channel(s, voice.cid)) leaveVoice();
     if (cur.sid === sid && (!channel(s, cur.cid) || removed.some((c) => c.id === cur.cid))) {
-      selectChannel((s.channels.find((c) => c.type === 'text') || s.channels[0] || {}).id || null);
+      selectChannel((s.channels[0] || {}).id || null);
     }
     render();
   }
@@ -824,13 +825,10 @@
     const k = sid + '/' + m.cid;
     if (typing[k]) delete typing[k][m.a.id];
     const viewing = sid === cur.sid && m.cid === cur.cid;
+    // A direct message or an @mention of mine gets the call chime, even while I'm reading the channel.
+    if (m.a.id !== me.id && (server(sid)?.dm || mentionsMe(m.text))) playTone(true);
     if (viewing && !document.hidden) markRead(sid, m.cid);
-    if (!viewing || document.hidden) {
-      notify(sid, m);
-      // 复用“自己进语音频道”的上升提示音：收到他人私聊时提醒（自己发的不响）
-      const _s = server(sid);
-      if (_s && _s.dm && m.a && m.a.id !== me.id) playTone(true);
-    }
+    if (!viewing || document.hidden) notify(sid, m);
     if (viewing) { renderMessages(); renderTyping(); }
     refreshSearch();
     renderRail();
@@ -840,7 +838,7 @@
   function sendMessage(text) {
     const s = server(cur.sid);
     const c = channel(s, cur.cid);
-    if (!s || !c || c.type !== 'text') return false;
+    if (!s || !c) return false;
     text = text.replace(/\s+$/, '').replace(/^\n+/, '');
     if (!text && !pending.length) return false;
     if (text.length > 4000) { toast('Message is too long (4000 characters max).'); return false; }
@@ -890,7 +888,7 @@
   }
 
   function saveComposerDraft() {
-    if (channel(server(cur.sid), cur.cid)?.type !== 'text') return;
+    if (!channel(server(cur.sid), cur.cid)) return;
     composerDrafts.set(cur.sid + '/' + cur.cid, { text: $('msgInput').value, pending: [...pending], replyTarget });
   }
   function restoreComposerDraft() {
@@ -961,7 +959,7 @@
     for (let i = list.length - 1; i >= 0 && list[i].ts > r; i--) if (!list[i].del && me && list[i].a.id !== me.id) n++;
     return n;
   }
-  const serverUnread = (s) => s.channels.some((c) => c.type === 'text' && unreadCount(s.id, c.id) > 0);
+  const serverUnread = (s) => s.channels.some((c) => unreadCount(s.id, c.id) > 0);
 
   let lastTypingSent = 0;
   function sendTyping() {
@@ -975,7 +973,7 @@
     const s = server(sid), c = channel(s, m.cid);
     if (!s || !c) return;
     try {
-      const n = new Notification(s.dm ? `${m.a.name} (direct message)` : `${m.a.name} (#${c.name}, ${s.name})`, { body: (m.text || (m.file ? '📎 ' + m.file.name : m.img ? '📷 Image' : '')).slice(0, 200), tag: sid + m.cid });
+      const n = new Notification(s.dm ? `${m.a.name} (direct message)` : `${m.a.name} (${c.name}, ${s.name})`, { body: (m.text || (m.file ? '📎 ' + m.file.name : m.img ? '📷 Image' : '')).slice(0, 200), tag: sid + m.cid });
       n.onclick = () => { window.focus(); selectServer(sid); selectChannel(m.cid); };
     } catch { }
   }
@@ -1417,7 +1415,7 @@
   const fileTransfers = window.DischordFiles.create({
     send,
     fast: fastFiles,
-    getMessage: (sid, cid, mid) => channel(server(sid), cid)?.type === 'text' ? (getMsgs(sid)[cid] || []).find((m) => m.id === mid) : undefined,
+    getMessage: (sid, cid, mid) => channel(server(sid), cid) ? (getMsgs(sid)[cid] || []).find((m) => m.id === mid) : undefined,
     isPeer: (sid, uid, uuid) => { const via = sid === DM ? connServer(uuid) : sid; return !!(peers[via] && peers[via].get(uuid)?.uid === uid); },
     resolvePeer: (sid, uid, cid, mid) => {
       const origin = fileProviders.get(sid + '/' + cid + '/' + mid);
@@ -1501,7 +1499,7 @@
     if (!server(sid)) return null;
     const all = getMsgs(sid);
     for (const channelId of cid ? [cid] : Object.keys(all)) {
-      if (channel(server(sid), channelId)?.type !== 'text') continue;
+      if (!channel(server(sid), channelId)) continue;
       const m = (all[channelId] || []).find((m) => !m.del && m.img && m.img.id === id && (!mid || m.id === mid));
       if (m && (m.file ? window.DischordImages.isImage(m.file) && m.img.preview === 1 : !m.img.preview)) return m;
     }
@@ -1529,7 +1527,7 @@
   async function prepareImagePreview(sid, cid, mid, attachment) {
     const key = imageMessageKey(sid, cid, mid);
     const live = () => {
-      if (!server(sid) || channel(server(sid), cid)?.type !== 'text') return null;
+      if (!server(sid) || !channel(server(sid), cid)) return null;
       const m = (getMsgs(sid)[cid] || []).find((m) => m.id === mid && !m.del);
       return m && m.file && m.file.id === attachment.meta.id && fileTransfers.hasLocal(sid, cid, mid) ? m : null;
     };
@@ -1707,7 +1705,7 @@
   const pending = [];          // selected File references; no reading, encoding or persistence
   function addAttachments(files) {
     const s = server(cur.sid), c = channel(s, cur.cid);
-    if (!c || c.type !== 'text') return;
+    if (!c) return;
     for (const f of [...files].slice(0, 4)) {
       if (pending.length >= 4) { toast('Up to 4 files per message.'); break; }
       const meta = window.DischordFiles.cleanMeta({ id: rid(16), name: f.name, size: f.size, type: f.type });
@@ -1889,7 +1887,7 @@ function reportMediaActive(active) {
 
 function joinVoice(sid, cid, withCam) {
     const s = server(sid), c = channel(s, cid);
-    if (!s || !c || c.type !== 'voice') return;
+    if (!s || !c) return;
     const rejoin = voice && voice.sid === sid && voice.cid === cid;
     const keepShare = rejoin ? { ssFrame: voice.ssFrame, ss: voice.ss, ssVs: voice.ssVs, ssTimer: voice.ssTimer, ssSettings: voice.ssSettings, ssQuality: voice.ssQuality } : null;
     if (voice) { dropVoiceFrame(); if (!rejoin) stopShare(true); }
@@ -1915,7 +1913,6 @@ function joinVoice(sid, cid, withCam) {
     if (rejoin) scheduleVoice(call, load, 500); else load();
     $('pubHost').appendChild(f);
     broadcastState();
-    // 私聊提示音已复用此上升音调；自己进语音房间不再播放提示音
     render();
   }
 
@@ -1937,7 +1934,6 @@ function joinVoice(sid, cid, withCam) {
     focusUid = null;
     for (const k in speaking) delete speaking[k];
     broadcastState();
-    playTone(false);
     render();
   }
 
@@ -2353,7 +2349,6 @@ function joinVoice(sid, cid, withCam) {
   function playTone(up) {
     try {
       audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
       const o = audioCtx.createOscillator(), g = audioCtx.createGain();
       o.type = 'sine';
       const t = audioCtx.currentTime;
@@ -2508,8 +2503,7 @@ function joinVoice(sid, cid, withCam) {
   });
   function animateMobileView() {
     const c = channel(server(cur.sid), cur.cid);
-    if (c?.type === 'voice' && voice && voice.sid === cur.sid && voice.cid === c.id) return;
-    const content = $(c ? c.type === 'text' ? 'messages' : 'voiceIdle' : 'welcome');
+    const content = $(c ? (voice && voice.sid === cur.sid && voice.cid === c.id && !$('voiceStage').classList.contains('offstage') ? 'voiceStage' : 'messages') : 'welcome');
     animateMobile(content, [{ opacity: .35, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }]);
   }
   function renderMobileNavigation() {
@@ -2575,8 +2569,7 @@ function joinVoice(sid, cid, withCam) {
     const s = server(sid);
     if (s) {
       const want = lastChan[sid];
-      const firstText = s.channels.find((c) => c.type === 'text');
-      cur.cid = channel(s, want) ? want : (firstText || s.channels[0] || {}).id || null;
+      cur.cid = channel(s, want) ? want : (s.channels[0] || {}).id || null;
     } else cur.cid = null;
     restoreComposerDraft();
     render();
@@ -2597,7 +2590,7 @@ function joinVoice(sid, cid, withCam) {
   }
   function afterChannelSelect() {
     const c = channel(server(cur.sid), cur.cid);
-    if (c && c.type === 'text') {
+    if (c) {
       markRead(cur.sid, cur.cid);
       renderRail(); renderChannels();
       renderMessages(true);
@@ -2610,10 +2603,9 @@ function joinVoice(sid, cid, withCam) {
     const s = {
       id: rid(10), key: rid(16), name: name.slice(0, 64), v: now(),
       channels: [
-        { id: rid(6), name: '闲聊', type: 'text' },
-        { id: rid(6), name: '截图分享', type: 'text' },
-        { id: rid(6), name: '开黑语音', type: 'voice' },
-        { id: rid(6), name: '闲聊语音', type: 'voice' },
+        { id: rid(6), name: '综合频道' },
+        { id: rid(6), name: '开黑' },
+        { id: rid(6), name: '摸鱼' },
       ],
     };
     servers.push(s);
@@ -2685,7 +2677,7 @@ function joinVoice(sid, cid, withCam) {
     renderControls();
     renderStage();
   }
-  function renderPresence() { renderChannels(); renderMembers(); renderUserPanel(); renderVoiceIdle(); renderStage(); }
+  function renderPresence() { renderChannels(); renderMembers(); renderUserPanel(); renderStage(); }
 
   function renderRail() {
     if (!me) return;
@@ -2694,7 +2686,7 @@ function joinVoice(sid, cid, withCam) {
     let total = dmServer.channels.reduce((n, c) => n + unreadCount(DM, c.id), 0);
     $('homeBtn').classList.toggle('active', !cur.sid || cur.sid === DM);
     $('homeBtn').dataset.badge = total ? (total > 99 ? '99+' : total) : '';
-    for (const s of servers) for (const c of s.channels) if (c.type === 'text') total += unreadCount(s.id, c.id);
+    for (const s of servers) for (const c of s.channels) total += unreadCount(s.id, c.id);
     document.title = (total ? `(${total}) ` : '') + '咚咚';
   }
 
@@ -2726,39 +2718,31 @@ function joinVoice(sid, cid, withCam) {
     const el = $('channelList');
     if (!s) {
       el.innerHTML = `<div class="cat"><span>Your servers</span></div>` + (servers.length
-        ? servers.map((x) => `<div class="chan" data-sid="${esc(x.id)}"><span class="ico">${icon('hash')}</span><span class="name">${esc(x.name)}</span></div>`).join('')
+        ? servers.map((x) => `<div class="chan" data-sid="${esc(x.id)}"><span class="name">${esc(x.name)}</span></div>`).join('')
         : `<div class="chan" style="cursor:default">No servers yet</div>`);
       return;
     }
     if (s.dm) {
       const last = (u) => { const l = getMsgs(DM)[u.id] || []; return l.length ? l[l.length - 1].ts : 0; };
       const list = dms.filter((u) => !u.hid).sort((a, b) => last(b) - last(a));
-      el.innerHTML = `<div class="cat"><span>Direct messages</span></div>` + (list.length ? list.map((u) => {
+      el.innerHTML = `<div class="cat"><span>Direct messages</span><button class="icon-btn" data-add title="Create channel">${icon('plus')}</button></div>` + (list.length ? list.map((u) => {
         const n = u.id === cur.cid ? 0 : unreadCount(DM, u.id);
-        return `<div class="chan dm ${u.id === cur.cid ? 'active' : ''} ${n ? 'unread' : ''} ${dmOnline(u.id) ? '' : 'offline'}" data-cid="${esc(u.id)}" data-type="text">${avatar(u, true)}<span class="name">${esc(u.name)}</span>${n ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : ''}</div>`;
+        return `<div class="chan dm ${u.id === cur.cid ? 'active' : ''} ${n ? 'unread' : ''} ${dmOnline(u.id) ? '' : 'offline'}" data-cid="${esc(u.id)}">${avatar(u, true)}<span class="name">${esc(u.name)}</span>${n ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : ''}</div>`;
       }).join('') : `<div class="dm-empty">No conversations yet. Right-click someone in a server and choose <b>Message</b>.</div>`);
       if (channel(s, cur.cid)) $('chanTopic').textContent = dmTopic(cur.cid); // presence changes repaint this list
       return;
     }
-    const text = s.channels.filter((c) => c.type === 'text');
-    const vc = s.channels.filter((c) => c.type === 'voice');
-    let h = `<div class="cat"><span>Text channels</span><button class="icon-btn" data-add="text" title="Create channel">${icon('plus')}</button></div>`;
-    for (const c of text) {
+    let h = `<div class="cat"><span>Channels</span><button class="icon-btn" data-add title="Create channel">${icon('plus')}</button></div>`;
+    for (const c of s.channels) {
       const n = c.id === cur.cid ? 0 : unreadCount(s.id, c.id);
-      h += `<div class="chan ${c.id === cur.cid ? 'active' : ''} ${n ? 'unread' : ''}" data-cid="${esc(c.id)}" data-type="text" draggable="true">
-        <span class="ico">${icon('hash')}</span><span class="name">${esc(c.name)}</span>
-        ${n ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : ''}
-</div>`;
-    }
-    h += `<div class="cat"><span>Voice channels</span><button class="icon-btn" data-add="voice" title="Create channel">${icon('plus')}</button></div>`;
-    for (const c of vc) {
       const who = voiceOccupants(s.id, c.id);
       if (!who.length) delete callStarts[s.id + '/' + c.id]; // the call ended when the last person left
       const mine = voice && voice.sid === s.id && voice.cid === c.id;
-      h += `<div class="chan ${c.id === cur.cid ? 'active' : ''} ${mine ? 'connected' : ''}" data-cid="${esc(c.id)}" data-type="voice" draggable="true">
-        <span class="ico">${icon('speaker')}</span><span class="name">${esc(c.name)}</span>
+      h += `<div class="chan ${c.id === cur.cid ? 'active' : ''} ${n ? 'unread' : ''} ${mine ? 'connected' : ''}" data-cid="${esc(c.id)}" draggable="true">
+        <span class="name">${esc(c.name)}</span>
         ${who.length && callStart(s.id, c.id) ? `<span class="chan-time" data-start="${callStart(s.id, c.id)}" title="Call running for">${fmtDur(now() - callStart(s.id, c.id))}</span>` : ''}
         ${who.length ? `<span class="count">${who.length}</span>` : ''}
+        ${n ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : ''}
 </div>`;
       if (who.length) {
         h += `<div class="voice-users" data-vc="${esc(c.id)}">${who.map((o) => `<div class="voice-user" data-uid="${esc(o.self ? me.id : o.user.id)}" draggable="true">${avatar(o.user)}<span class="vu-name">${esc(o.user.name)}</span>${pingTag(o)}<span class="vu-icons">${stateIcons(o.st)}</span></div>`).join('')}</div>`;
@@ -2772,28 +2756,59 @@ function joinVoice(sid, cid, withCam) {
     const s = server(cur.sid);
     const c = channel(s, cur.cid);
     $('welcome').classList.toggle('hidden', !!c);
-    $('textView').classList.toggle('hidden', !c || c.type !== 'text');
-    $('voiceView').classList.toggle('hidden', !c || c.type !== 'voice');
+    $('textView').classList.toggle('hidden', !c);
     const inThisVoice = !!(voice && c && voice.sid === cur.sid && voice.cid === c.id);
-    const stageWas = stageShape();
-    $('voiceStage').classList.toggle('offstage', !inThisVoice);
+    // In-call layout is a vertical split: the call stage on top, chat below. `stageExpanded` now means
+    // "split view" (call + chat together); body.in-this-call drives it. Full-bleed remains via fullscreen.
+    document.body.classList.toggle('in-call', !!voice);
+    document.body.classList.toggle('in-this-call', inThisVoice && stageExpanded);
+    document.body.classList.toggle('call-full', false); // legacy class: the takeover layout is gone
+    $('voiceStage').classList.toggle('offstage', !(inThisVoice && stageExpanded));
     $('voiceStage').classList.toggle('hidden', !voice);
     updateMini();
-    morphStage(stageWas);
     $('mainHeader').classList.toggle('hidden', !c);
-    $('voiceView').classList.toggle('behind', inThisVoice);
+    renderCallDock(s, c, inThisVoice);
+    $('headerCallBtn').classList.add('hidden'); // the split view keeps the chat always visible
     refreshSearch();
     renderMobileNavigation();
 
     if (!c) return;
-    $('chanIcon').innerHTML = icon(s.dm ? 'at' : c.type === 'text' ? 'hash' : 'speaker');
+    $('chanIcon').innerHTML = s.dm ? icon('at') : '';
     $('chanName').textContent = c.name;
-    $('chanTopic').textContent = s.dm ? dmTopic(c.id) : c.type === 'voice' ? 'Voice & video, peer-to-peer' : '';
-    if (c.type === 'text') {
-      $('msgInput').placeholder = s.dm ? `Message @${c.name}` : `Message #${c.name}`;
-      renderMessages();
-      renderTyping();
-    } else renderVoiceIdle();
+    $('chanTopic').textContent = s.dm ? dmTopic(c.id) : '';
+    $('msgInput').placeholder = s.dm ? `Message @${c.name}` : `Message ${c.name}`;
+    renderMessages();
+    renderTyping();
+  }
+
+  // One channel kind now: messages and the call share the view. Being in this channel's call splits the
+  // column vertically (call on top, chat below); the dock stays as the status bar with a hide/show toggle.
+  let stageExpanded = store.get('stageExpanded', true); // split view shown while in this channel's call
+  function setStageExpanded(on) {
+    if (stageExpanded === on) return;
+    stageExpanded = on;
+    store.set('stageExpanded', on);
+    render();
+  }
+  function renderCallDock(s, c, inThisVoice) {
+    const dock = $('callDock');
+    dock.classList.toggle('hidden', !c || (voice && !inThisVoice));
+    if (!c || (voice && !inThisVoice)) return;
+    const who = voiceOccupants(s.id, c.id);
+    $('dockIdleText').textContent = who.length
+      ? `${who.length} 人正在通话`
+      : '语音与文字已合并到本频道 · 暂无人在通话';
+    $('dockJoin').classList.toggle('hidden', inThisVoice);
+    $('dockCam').classList.toggle('hidden', inThisVoice);
+    $('dockIdle').classList.toggle('hidden', inThisVoice);
+    $('dockLive').classList.toggle('hidden', !inThisVoice);
+    if (inThisVoice && voice) {
+      $('dockWho').textContent = who.length + ' 人';
+      $('dockTime').textContent = fmtDur(now() - voice.since);
+      $('dockExpand').classList.toggle('on', stageExpanded);
+      $('dockExpand').title = stageExpanded ? '隐藏通话视图' : '显示通话视图';
+      $('dockMic').classList.toggle('off', !!(myState().m || myState().d));
+    }
   }
 
   // ---------------------------------------------------------------- call stage
@@ -3421,8 +3436,7 @@ function joinVoice(sid, cid, withCam) {
       const inp = $('mName');
       inp.select();
       const ok = () => {
-        let n = inp.value.trim();
-        if (c.type === 'text') n = n.toLowerCase().replace(/\s+/g, '-');
+        let n = inp.value.trim().toLowerCase().replace(/\s+/g, '-');
         if (!n) return;
         c.name = n.slice(0, 40);
         bumpServer(s);
@@ -3435,11 +3449,11 @@ function joinVoice(sid, cid, withCam) {
   function deleteChannelConfirm(cid) {
     const s = server(cur.sid), c = channel(s, cid);
     if (!c) return;
-    confirmModal('Delete channel', `Delete ${c.type === 'text' ? '#' : ''}${c.name} for everyone?`, 'Delete channel', () => {
+    confirmModal('Delete channel', `Delete ${c.name} for everyone?`, 'Delete channel', () => {
       s.channels = s.channels.filter((x) => x.id !== c.id);
       releaseChannelFiles(s.id, c.id);
       if (voice && voice.sid === s.id && voice.cid === c.id) leaveVoice();
-      if (cur.cid === c.id) selectChannel((s.channels.find((x) => x.type === 'text') || s.channels[0] || {}).id || null);
+      if (cur.cid === c.id) selectChannel((s.channels[0] || {}).id || null);
       bumpServer(s);
     });
   }
@@ -3450,7 +3464,7 @@ function joinVoice(sid, cid, withCam) {
   function markServerRead(sid) {
     const s = server(sid);
     if (!s) return;
-    s.channels.forEach((c) => { if (c.type === 'text') markRead(sid, c.id); });
+    s.channels.forEach((c) => markRead(sid, c.id));
     renderRail(); renderChannels();
   }
   function channelMenu(cid, x, y) {
@@ -3468,11 +3482,11 @@ function joinVoice(sid, cid, withCam) {
       });
     }
     const inIt = !!(voice && voice.sid === s.id && voice.cid === c.id);
-    let h = `<div class="ctx-head"><span>${c.type === 'text' ? '# ' : ''}${esc(c.name)}</span></div>`;
-    const started = c.type === 'voice' && voiceOccupants(s.id, c.id).length ? callStart(s.id, c.id) : null;
+    let h = `<div class="ctx-head"><span>${esc(c.name)}</span></div>`;
+    const started = voiceOccupants(s.id, c.id).length ? callStart(s.id, c.id) : null;
     if (started) h += `<div class="ctx-note">Call running for <b class="call-clock" data-start="${started}">${fmtDur(now() - started)}</b></div>`;
-    if (c.type === 'text') h += ctxItem('read', 'check', 'Mark as read');
-    else h += inIt ? ctxItem('leave', 'hangup', 'Disconnect', 'danger') : ctxItem('join', 'speaker', 'Join voice') + ctxItem('joincam', 'camera', 'Join with camera');
+    h += ctxItem('read', 'check', 'Mark as read');
+    h += inIt ? ctxItem('leave', 'hangup', 'Disconnect', 'danger') : ctxItem('join', 'speaker', 'Join voice') + ctxItem('joincam', 'camera', 'Join with camera');
     h += ctxItem('invite', 'userPlus', 'Invite people') + '<div class="ctx-sep"></div>';
     h += ctxItem('rename', 'edit', 'Rename channel') + ctxItem('del', 'trash', 'Delete channel', 'danger');
     openCtx(x, y, h, (menu) => {
@@ -3497,7 +3511,7 @@ function joinVoice(sid, cid, withCam) {
     const s = server(cur.sid);
     if (!s || s.dm) return;
     const h = `<div class="ctx-head"><span>${esc(s.name)}</span></div>` +
-      ctxItem('addText', 'hash', 'Create text channel') + ctxItem('addVoice', 'speaker', 'Create voice channel') +
+      ctxItem('addChannel', 'hash', 'Create channel') +
       ctxItem('invite', 'userPlus', 'Invite people') + ctxItem('read', 'check', 'Mark server as read') + '<div class="ctx-sep"></div>' +
       ctxItem('rename', 'edit', 'Rename server') + ctxItem('leave', 'logout', 'Leave server', 'danger');
     openCtx(x, y, h, (menu) => {
@@ -3506,8 +3520,7 @@ function joinVoice(sid, cid, withCam) {
         if (!b) return;
         closeCtx();
         switch (b.dataset.act) {
-          case 'addText': return channelModal('text');
-          case 'addVoice': return channelModal('voice');
+          case 'addChannel': return channelModal();
           case 'invite': return inviteModal();
           case 'read': return markServerRead(s.id);
           case 'rename': return renameModal();
@@ -3703,15 +3716,7 @@ function joinVoice(sid, cid, withCam) {
     };
   }
 
-  function renderVoiceIdle() {
-    const s = server(cur.sid), c = channel(s, cur.cid);
-    if (!c || c.type !== 'voice') return;
-    const who = voiceOccupants(s.id, c.id);
-    $('voiceIdleTitle').textContent = c.name;
-    $('voiceIdleWho').innerHTML = who.length
-      ? `<div class="vi-people">${who.map((o) => `<div class="vi-person" data-uid="${esc(o.user.id)}">${avatar(o.user, false, 'big')}<span>${esc(o.user.name)}</span></div>`).join('')}</div>`
-      : '<p>No one is here yet. Jump in and others will see you in the channel list.</p>';
-  }
+  function renderVoiceIdle() { /* merged channels: the call dock replaces the old idle voice panel */ }
 
   function fmtTime(ts) { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
   function fmtStamp(ts) {
@@ -3789,12 +3794,12 @@ function joinVoice(sid, cid, withCam) {
   function renderMessages(forceBottom) {
     const box = $('messages');
     const s = server(cur.sid), c = channel(s, cur.cid);
-    if (!c || c.type !== 'text') return;
+    if (!c) return;
     const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
     const list = (getMsgs(s.id)[c.id] || []).filter((m) => !m.del);
     let h = s.dm
       ? `<div class="chan-intro"><div class="big">${icon('at')}</div><h2>${esc(c.name)}</h2><p>This is the start of your direct messages with ${esc(c.name)}. They go straight from your device to theirs; messages sent while one of you is offline arrive the next time you are both online.</p></div>`
-      : `<div class="chan-intro"><div class="big">${icon('hash')}</div><h2>Welcome to #${esc(c.name)}!</h2><p>This is the start of the #${esc(c.name)} channel. Messages travel peer-to-peer; people who join later get recent history from whoever is online.</p></div>`;
+      : `<div class="chan-intro"><h2>Welcome to ${esc(c.name)}!</h2><p>This is the start of the ${esc(c.name)} channel. Messages travel peer-to-peer; people who join later get recent history from whoever is online.</p></div>`;
     let prev = null;
     for (const m of list) {
       const newDay = !prev || new Date(prev.ts).toDateString() !== new Date(m.ts).toDateString();
@@ -3928,8 +3933,8 @@ function joinVoice(sid, cid, withCam) {
     for (const w of query.toLowerCase().split(/\s+/).filter(Boolean)) (w.startsWith('from:') && w.length > 5 ? from : words).push(w.startsWith('from:') && w.length > 5 ? w.slice(5).replace(/^@/, '') : w);
     if (!words.length && !from.length) return { hits: [], words };
     const places = [];
-    const add = (sv) => sv.channels.filter((c) => c.type === 'text').forEach((c) => places.push({ s: sv, c }));
-    if (scope === 'channel') { const sv = server(cur.sid), c = channel(sv, cur.cid); if (c && c.type === 'text') places.push({ s: sv, c }); }
+    const add = (sv) => sv.channels.forEach((c) => places.push({ s: sv, c }));
+    if (scope === 'channel') { const sv = server(cur.sid), c = channel(sv, cur.cid); if (c) places.push({ s: sv, c }); }
     else if (scope === 'server' && server(cur.sid)) add(server(cur.sid));
     else { servers.forEach(add); add(dmServer); }
     const hits = [];
@@ -3942,7 +3947,7 @@ function joinVoice(sid, cid, withCam) {
         const text = (m.text || '') + (m.file ? ' ' + m.file.name : '');
         const low = text.toLowerCase();
         if (!words.every((w) => low.includes(w))) continue;
-        hits.push({ sid: sv.id, cid: c.id, m, name, where: sv.dm ? '@' + c.name : '#' + c.name + (scope === 'all' ? ' · ' + sv.name : '') });
+        hits.push({ sid: sv.id, cid: c.id, m, name, where: sv.dm ? '@' + c.name : c.name + (scope === 'all' ? ' · ' + sv.name : '') });
       }
     }
     hits.sort((a, b) => b.m.ts - a.m.ts);
@@ -3963,9 +3968,9 @@ function joinVoice(sid, cid, withCam) {
   let searchHits = [], searchTimer = null;
   const searchOpen = () => !$('searchPanel').classList.contains('hidden');
   function paintSearchScopes() {
-    const sv = server(cur.sid), c = channel(sv, cur.cid), inText = !!(c && c.type === 'text');
+    const sv = server(cur.sid), c = channel(sv, cur.cid), inText = !!c;
     if (!sv) searchScope = 'all'; else if (searchScope === 'channel' && !inText) searchScope = 'server';
-    const scopes = [['channel', inText ? (sv.dm ? '@' : '#') + c.name : '', inText], ['server', sv ? (sv.dm ? 'All direct messages' : sv.name) : '', !!sv], ['all', 'Everywhere', true]];
+    const scopes = [['channel', inText ? (sv.dm ? '@' : '') + c.name : '', inText], ['server', sv ? (sv.dm ? 'All direct messages' : sv.name) : '', !!sv], ['all', 'Everywhere', true]];
     const h = scopes.filter((x) => x[2]).map(([id, label]) => `<button type="button" data-scope="${id}" class="${id === searchScope ? 'on' : ''}">${esc(label)}</button>`).join('');
     if ($('sScope').dataset.raw !== h) { $('sScope').dataset.raw = h; $('sScope').innerHTML = h; }
   }
@@ -4215,7 +4220,7 @@ function joinVoice(sid, cid, withCam) {
     $('meName').textContent = me.name;
     let peersN = 0;
     if (cur.sid) for (const id in members[cur.sid] || {}) if (isOnline(members[cur.sid][id])) peersN++;
-    $('meStatus').textContent = cur.sid ? (peersN ? `${peersN} other${peersN === 1 ? '' : 's'} online` : 'Waiting for others…') : 'Online';
+    $('meStatus').textContent = cur.sid ? (peersN ? `另有 ${peersN} 人在线` : '等待其他人加入…') : '在线';
     $('voiceStatus').classList.toggle('hidden', !voice);
     if (voice) {
       const s = server(voice.sid), c = channel(s, voice.cid);
@@ -4227,9 +4232,12 @@ function joinVoice(sid, cid, withCam) {
   // how long I have been in this call (survives camera on/off, which reconnects)
   function paintCallTime() {
     const el = $('vsTime');
-    if (!el) return;
-    if (!voice || !voice.since) { el.textContent = ''; return; }
-    el.textContent = fmtDur(now() - voice.since);
+    if (el) {
+      if (!voice || !voice.since) el.textContent = '';
+      else el.textContent = fmtDur(now() - voice.since);
+    }
+    const dk = $('dockTime'); // the dock shows its own clock while collapsed
+    if (dk && voice && voice.since) dk.textContent = fmtDur(now() - voice.since);
   }
   function fmtDur(ms) {
     const t = Math.max(0, Math.floor(ms / 1000));
@@ -4244,7 +4252,7 @@ function joinVoice(sid, cid, withCam) {
 
   function renderControls() {
     const muted = !micOn || deaf;
-    for (const id of ['micBtn', 'cbMic']) { const b = $(id); setIcon(b, muted ? 'micOff' : 'mic'); b.classList.toggle('off', muted); b.title = muted ? 'Unmute' : 'Mute'; }
+    for (const id of ['micBtn', 'cbMic', 'dockMic']) { const b = $(id); setIcon(b, muted ? 'micOff' : 'mic'); b.classList.toggle('off', muted); b.title = muted ? 'Unmute' : 'Mute'; }
     for (const id of ['deafBtn', 'cbDeaf']) { const b = $(id); setIcon(b, deaf ? 'deaf' : 'headphones'); b.classList.toggle('off', deaf); b.title = deaf ? 'Undeafen' : 'Deafen'; }
     const cam = !!(voice && voice.cam), ss = !!(voice && voice.ss);
     setIcon($('cbCam'), cam ? 'camera' : 'cameraOff');
@@ -4537,24 +4545,17 @@ function joinVoice(sid, cid, withCam) {
     });
   }
 
-  function channelModal(type) {
+  function channelModal() {
     const s = server(cur.sid);
     modal(`<h2>Create channel</h2>
-      <label>Channel type</label>
-      <div class="radio-row">
-        <label class="opt"><input type="radio" name="ct" value="text" ${type !== 'voice' ? 'checked' : ''}> <i data-icon="hash"></i> Text</label>
-        <label class="opt"><input type="radio" name="ct" value="voice" ${type === 'voice' ? 'checked' : ''}> <i data-icon="speaker"></i> Voice</label>
-      </div>
       <label>Channel name</label><input type="text" id="mName" maxlength="40" placeholder="new-channel">
       <div class="actions"><button class="btn link" data-close>Cancel</button><button class="btn primary" id="mOk">Create channel</button></div>`, () => {
       const inp = $('mName');
       inp.focus();
       const ok = () => {
-        const t = document.querySelector('input[name=ct]:checked').value;
-        let n = inp.value.trim();
-        if (t === 'text') n = n.toLowerCase().replace(/\s+/g, '-');
+        const n = inp.value.trim().toLowerCase().replace(/\s+/g, '-');
         if (!n) return;
-        const c = { id: rid(6), name: n.slice(0, 40), type: t };
+        const c = { id: rid(6), name: n.slice(0, 40) };
         s.channels.push(c);
         bumpServer(s);
         closeModal();
@@ -4591,7 +4592,7 @@ function joinVoice(sid, cid, withCam) {
     if (!e.target.closest('[data-forget-all]')) return;
     const sid = cur.sid, ms = members[sid] || {};
     const ids = [...new Set([...Object.keys(getKnown(sid)), ...Object.keys(ms)])].filter((id) => id !== me.id && !isOnline(ms[id]));
-    if (ids.length) confirmModal('Remove offline people', `Remove ${ids.length} offline ${ids.length === 1 ? 'person' : 'people'} from the member list? Their messages stay, and anyone who comes back online is listed again.`, 'Remove', () => { const n = forgetUsers(sid, ids, true); toast(`Removed ${n} ${n === 1 ? 'person' : 'people'}`); });
+    if (ids.length) confirmModal('移除离线成员', `要从成员列表中移除 ${ids.length} 位离线成员吗？他们的消息会保留，重新上线后会再次显示。`, '移除', () => { const n = forgetUsers(sid, ids, true); toast(`已移除 ${n} 人`); });
   });
   $('addServerBtn').onclick = createServerModal;
   $('searchTop').onclick = () => (searchOpen() ? closeSearch() : openSearch());
@@ -4630,8 +4631,7 @@ function joinVoice(sid, cid, withCam) {
     const s = server(cur.sid);
     switch (a.dataset.act) {
       case 'invite': inviteModal(); break;
-      case 'addText': channelModal('text'); break;
-      case 'addVoice': channelModal('voice'); break;
+      case 'addChannel': channelModal(); break;
       case 'rename': renameModal(); break;
       case 'leave': confirmLeave(s); break;
     }
@@ -4643,15 +4643,15 @@ function joinVoice(sid, cid, withCam) {
     const list = $('channelList');
     const clearMarks = () => list.querySelectorAll('.drop-before, .drop-after, .drop-into').forEach((el) => el.classList.remove('drop-before', 'drop-after', 'drop-into'));
     const voiceRowFor = (target) => {
-      const row = target.closest('.chan[data-type="voice"]');
+      const row = target.closest('.chan[data-cid]');
       if (row) return row;
       const box = target.closest('.voice-users');
-      return box ? [...list.querySelectorAll('.chan[data-type="voice"]')].find((r) => r.dataset.cid === box.dataset.vc) : null;
+      return box ? [...list.querySelectorAll('.chan[data-cid]')].find((r) => r.dataset.cid === box.dataset.vc) : null;
     };
     list.addEventListener('dragstart', (e) => {
       const person = e.target.closest('.voice-user[data-uid]'), row = !person && e.target.closest('.chan[data-cid]');
       if ((!person && !row) || cur.sid === DM) return;
-      listDrag = person ? { kind: 'user', id: person.dataset.uid } : { kind: 'chan', id: row.dataset.cid, type: row.dataset.type };
+      listDrag = person ? { kind: 'user', id: person.dataset.uid } : { kind: 'chan', id: row.dataset.cid };
       (person || row).classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', listDrag.id);
@@ -4667,7 +4667,7 @@ function joinVoice(sid, cid, withCam) {
         return;
       }
       const row = e.target.closest('.chan[data-cid]');
-      if (!row || row.dataset.type !== listDrag.type || row.dataset.cid === listDrag.id) return;
+      if (!row || row.dataset.cid === listDrag.id) return;
       e.preventDefault();
       const r = row.getBoundingClientRect();
       row.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after');
@@ -4688,7 +4688,7 @@ function joinVoice(sid, cid, withCam) {
         return;
       }
       const row = e.target.closest('.chan[data-cid]');
-      if (!row || row.dataset.type !== d.type || row.dataset.cid === d.id) return;
+      if (!row || row.dataset.cid === d.id) return;
       const r = row.getBoundingClientRect(), after = e.clientY >= r.top + r.height / 2;
       const moving = channel(s, d.id);
       if (!moving) return;
@@ -4703,17 +4703,33 @@ function joinVoice(sid, cid, withCam) {
 
   $('channelList').onclick = (e) => {
     const add = e.target.closest('[data-add]');
-    if (add) return channelModal(add.dataset.add);
+    if (add) return channelModal();
     const sv = e.target.closest('[data-sid]');
     if (sv) return selectServer(sv.dataset.sid);
     const ch = e.target.closest('[data-cid]');
+    // Merged channels: single click selects the channel; double-click joins its voice call.
     if (ch) {
-      const c = channel(server(cur.sid), ch.dataset.cid);
-      selectChannel(ch.dataset.cid);
-      // Discord-style: clicking a voice channel joins it
-      if (c && c.type === 'voice' && !(voice && voice.sid === cur.sid && voice.cid === c.id)) joinVoice(cur.sid, c.id, false);
+      const cid = ch.dataset.cid;
+      selectChannel(cid);
+      if (chanTapTimer && chanTapCid === cid) { // second tap on the same channel within the window
+        clearTimeout(chanTapTimer); chanTapTimer = 0;
+        if (!(voice && voice.sid === cur.sid && voice.cid === cid)) joinVoice(cur.sid, cid, false);
+      } else {
+        clearTimeout(chanTapTimer);
+        chanTapCid = cid;
+        chanTapTimer = setTimeout(() => { chanTapTimer = 0; }, 450);
+      }
     }
   };
+  $('channelList').ondblclick = (e) => {
+    // Native dblclick is the reliable path on desktop; the click-tap window above covers touch.
+    const ch = e.target.closest('[data-cid]');
+    if (!ch) return;
+    clearTimeout(chanTapTimer); chanTapTimer = 0;
+    const cid = ch.dataset.cid;
+    if (!(voice && voice.sid === cur.sid && voice.cid === cid)) joinVoice(cur.sid, cid, false);
+  };
+  let chanTapTimer = 0, chanTapCid = null;
 
   $('messages').onclick = (e) => {
     const more = e.target.closest('[data-message-menu]');
@@ -4787,8 +4803,13 @@ function joinVoice(sid, cid, withCam) {
     autosize();
   };
 
-  $('joinVoiceBtn').onclick = () => joinVoice(cur.sid, cur.cid, false);
-  $('joinVideoBtn').onclick = () => joinVoice(cur.sid, cur.cid, true);
+  $('dockJoin').onclick = () => joinVoice(cur.sid, cur.cid, false);
+  $('dockCam').onclick = () => joinVoice(cur.sid, cur.cid, true);
+  $('dockExpand').onclick = () => setStageExpanded(!stageExpanded);
+  $('dockMic').onclick = () => toggleMic();
+  $('dockLeave').onclick = leaveVoice;
+  $('dockLive').onclick = (e) => { if (!e.target.closest('button')) setStageExpanded(!stageExpanded); };
+  $('headerCallBtn').onclick = showVoice;
   $('vsLeave').onclick = leaveVoice;
   $('cbLeave').onclick = leaveVoice;
   $('vsCam').onclick = toggleCam;
