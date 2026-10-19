@@ -825,7 +825,12 @@
     if (typing[k]) delete typing[k][m.a.id];
     const viewing = sid === cur.sid && m.cid === cur.cid;
     if (viewing && !document.hidden) markRead(sid, m.cid);
-    if (!viewing || document.hidden) notify(sid, m);
+    if (!viewing || document.hidden) {
+      notify(sid, m);
+      // 复用“自己进语音频道”的上升提示音：收到他人私聊时提醒（自己发的不响）
+      const _s = server(sid);
+      if (_s && _s.dm && m.a && m.a.id !== me.id) playTone(true);
+    }
     if (viewing) { renderMessages(); renderTyping(); }
     refreshSearch();
     renderRail();
@@ -1910,7 +1915,7 @@ function joinVoice(sid, cid, withCam) {
     if (rejoin) scheduleVoice(call, load, 500); else load();
     $('pubHost').appendChild(f);
     broadcastState();
-    if (!rejoin) playTone(true);
+    // 私聊提示音已复用此上升音调；自己进语音房间不再播放提示音
     render();
   }
 
@@ -2348,6 +2353,7 @@ function joinVoice(sid, cid, withCam) {
   function playTone(up) {
     try {
       audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       const o = audioCtx.createOscillator(), g = audioCtx.createGain();
       o.type = 'sine';
       const t = audioCtx.currentTime;
