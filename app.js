@@ -31,7 +31,7 @@
   const STALE_LOOSE = 60000;      // peer with no live connection considered gone after this
   const STALE_VOICE = 180000;     // same, for someone in a call
   const PEER_GRACE = 20000;       // a dropped mesh connection may just be reconnecting: wait this long for the next ping
-  const COLORS = ['#5865f2', '#7b61ff', '#9b59b6', '#eb459e', '#ed4245', '#f47b67', '#e67e22', '#faa61a',
+  const COLORS = ['#FFB3DE', '#7b61ff', '#9b59b6', '#eb459e', '#ed4245', '#f47b67', '#e67e22', '#faa61a',
     '#f1c40f', '#57f287', '#3ba55c', '#1abc9c', '#00a8fc', '#3498db', '#607d8b', '#99aab5'];
   const EMOJIS = ['😀', '😁', '😂', '🤣', '😊', '😇', '🙂', '😉', '😍', '🥰', '😘', '😋', '😛', '😜', '🤪', '🤨',
     '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '😣', '😫', '😩', '🥺', '😢', '😭',
