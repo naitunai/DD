@@ -5,6 +5,25 @@
  */
 const { app, BrowserWindow, session, shell, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+// 启动诊断日志：双击闪退时可到 %APPDATA%/dingdong-desktop/logs 里找原因
+let logDir = '';
+try {
+  logDir = path.join(app.getPath('userData'), 'logs');
+  fs.mkdirSync(logDir, { recursive: true });
+} catch (_) {}
+function mainLog(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync(path.join(logDir, 'main.log'), line); } catch (_) {}
+  console.log(msg);
+}
+process.on('uncaughtException', (err) => {
+  mainLog('uncaughtException: ' + (err && err.stack || err));
+});
+process.on('unhandledRejection', (err) => {
+  mainLog('unhandledRejection: ' + (err && err.stack || err));
+});
 
 // 网页本体目录：随 electron-builder files:"app/**" 打进 asar
 const INDEX_HTML = path.join(__dirname, 'app', 'index.html');
@@ -30,7 +49,14 @@ function createWindow() {
     },
   });
 
-  win.loadFile(INDEX_HTML);
+  win.loadFile(INDEX_HTML).then(() => {
+    mainLog('window created, index.html loaded OK');
+  }).catch((err) => {
+    mainLog('loadFile failed: ' + (err && err.stack || err));
+  });
+  win.webContents.on('render-process-gone', (_e, details) => {
+    mainLog('render-process-gone: ' + JSON.stringify(details));
+  });
   win.on('closed', () => { win = null; });
 
   // 页内 target=_blank / window.open 一律交给系统浏览器，保持单窗口
@@ -53,9 +79,10 @@ app.whenReady().then(() => {
   });
 
   // Windows 上 Electron 不会自动枚举音频设备，需显式开启（否则选不到麦克风列表）
-  if (isWin) ses.enableDeviceEventEmitter();
+  // 该方法在部分 Electron 版本不存在，必须容错，否则主进程启动即崩、双击无窗口
+  try { if (isWin && typeof ses.enableDeviceEventEmitter === 'function') ses.enableDeviceEventEmitter(); } catch (_) {}
 
-  ses.on('notification-clicked', () => { if (win) win.focus(); });
+  if (ses.on) ses.on('notification-clicked', () => { if (win) win.focus(); });
 
   if (!isWin) Menu.setApplicationMenu(null);
   else Menu.setApplicationMenu(Menu.buildFromTemplate([
