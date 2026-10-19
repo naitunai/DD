@@ -2,21 +2,18 @@
   "name": "dingdong-desktop",
   "version": "1.0.0",
   "private": true,
-  "description": "叮咚 desktop client for the hosted peer-to-peer chat app.",
+  "description": "咚咚绿色版桌面客户端：离线加载 P2P 聊天网页，解压即用。",
   "author": "Dan-k391",
-  "contributors": ["ZJJ-2785"],
-  "homepage": "https://dan-k391.github.io/dingdong/",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Dan-k391/dingdong.git"
-  },
+  "contributors": ["ZJJ-2785", "naitunai"],
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "sync-app": "node sync-app.js",
+    "prebuild": "node sync-app.js",
     "build:win": "electron-builder --win --x64 --publish never"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=18"
   },
   "devDependencies": {
     "electron": "44.5.1",
@@ -27,35 +24,20 @@
     "productName": "DingDong",
     "asar": true,
     "directories": {
-      "output": "../dist"
+      "output": "release"
     },
     "files": [
-      "*.js",
-      "*.html",
-      "*.css",
+      "main.js",
+      "preload.js",
+      "app/**",
       "assets/*"
     ],
-    "artifactName": "DingDong-Windows.${ext}",
     "win": {
       "icon": "assets/icon.ico",
       "target": [
-        { "target": "portable", "arch": ["x64"] },
-        { "target": "nsis", "arch": ["x64"] },
         { "target": "zip", "arch": ["x64"] }
       ]
     },
-    "portable": {
-      "artifactName": "DingDong.exe"
-    },
-    "nsis": {
-      "artifactName": "DingDong-Setup.exe",
-      "oneClick": false,
-      "perMachine": false,
-      "selectPerMachineByDefault": false,
-      "allowElevation": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    }
+    "artifactName": "DingDong-Windows.${ext}"
   }
 }
