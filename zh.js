@@ -12,11 +12,11 @@
   const D = {
     // brand
     'Dischord': '咚咚', 'Welcome to Dischord': '欢迎来到咚咚', 'Welcome to 咚咚': '欢迎来到咚咚', 'Refresh 咚咚 to load screen-share controls.': '请刷新咚咚以加载屏幕共享控制。',
-    'Servers, text channels and voice/video rooms. Fully peer-to-peer, powered by VDO.Ninja. No accounts, no backend.': '服务器、文字频道、语音视频房间一应俱全。全程点对点直连，基于 VDO.Ninja，无需注册账号，不会上传你的数据。',
+    'Servers, text channels and voice/video rooms. Fully peer-to-peer, powered by VDO.Ninja. No accounts, no backend.': '服务器与频道一应俱全：文字与语音已合并，聊天、通话在同一频道进行。全程点对点直连，基于 VDO.Ninja，无需注册账号，不会上传你的数据。',
     // shell / nav
     'Open servers and channels': '打开服务器和频道', 'Channels': '频道', 'Back to call': '返回通话', 'User settings': '用户设置',
     'Close navigation': '关闭导航', '私信': '私信', 'Add a server': '添加服务器', 'Server options': '服务器选项',
-    'Invite people': '邀请好友', 'Create text channel': '创建文字频道', 'Create voice channel': '创建语音频道', 'Rename server': '重命名服务器',
+    'Invite people': '邀请好友', 'Create channel': '创建频道', 'Rename server': '重命名服务器',
     'Leave server': '退出服务器', 'Voice Connected': '语音已连接', 'Time in this call': '本次通话时长', 'Disconnect': '断开连接',
     'Turn on camera': '开启摄像头', 'Turn off camera': '关闭摄像头', 'Video': '视频', 'Share your screen': '共享屏幕', 'Screen': '屏幕',
     'Online': '在线', 'Offline': '离线', 'Mute': '静音', 'Unmute': '取消静音', 'Input options': '输入选项', 'Deafen': '关闭声音', 'Undeafen': '开启声音',
@@ -29,7 +29,7 @@
     'Show members': '显示成员', 'Close': '关闭', 'Stop sharing': '停止共享', 'Waiting for you to pick a screen… (click to cancel)': '等待选择共享画面…（点击取消）',
     'Voice connection': '语音连接',
     // channel list / members
-    'Your servers': '你的服务器', 'No servers yet': '还没有服务器', 'Text channels': '文字频道', 'Voice channels': '语音频道', 'Create channel': '创建频道',
+    'Your servers': '你的服务器', 'No servers yet': '还没有服务器', 'Channels': '频道', 'Text channels': '频道', 'Voice channels': '频道',
     'No conversations yet. Right-click someone in a server and choose': '还没有私信。在服务器中右键点击某人并选择', 'Message': '私信',
     'Call running for': '通话已进行', 'Voice & video, peer-to-peer': '语音和视频 · 点对点直连', '(you)': '（你）', 'Remove all offline people': '移除所有离线成员',
     'Waiting for others…': '等待其他人加入…', 'Members': '成员', 'online': '在线', 'offline': '离线',
@@ -128,7 +128,7 @@
     'Up to 4 files per message.': '每条消息最多 4 个文件。', 'Could not attach that file. Its name or size is invalid.': '无法添加该文件：文件名或大小无效。',
     'Image is still loading. Try again in a moment.': '图片仍在加载，请稍后再试。', 'Could not save that image.': '无法保存该图片。',
     'Could not copy the image. Your browser may not allow it.': '无法复制图片，浏览器可能不允许。', "That invite link doesn't look right.": '邀请链接格式不正确。',
-    'Open a text channel to mention someone.': '请先打开一个文字频道再提及成员。', 'Original message is no longer in local history.': '原消息已不在本地记录中。',
+    'Open a text channel to mention someone.': '请先打开一个频道再提及成员。', 'Original message is no longer in local history.': '原消息已不在本地记录中。',
     'Could not copy the report here.': '无法在此复制报告。', 'A newer version of 咚咚 is available. Reload the page to update.': '咚咚有新版本可用，刷新页面即可更新。',
     'Update the Windows app to restart sharing with the same source automatically.': '请更新 Windows 客户端，以便自动使用同一画面源重新共享。',
     // file transfer
@@ -146,6 +146,12 @@
     'This attachment is not an image.': '该附件不是图片。', 'This image format cannot be previewed by your browser.': '浏览器无法预览此图片格式。',
     'This image has invalid dimensions.': '图片尺寸无效。', 'This browser cannot create image previews.': '此浏览器无法生成图片预览。',
     'This browser could not encode the image preview.': '此浏览器无法编码图片预览。', 'This browser could not create a bounded image preview.': '此浏览器无法生成图片预览。',
+    // 补漏：动态文案与新增 UI
+    'Voice connected': '语音已连接', 'With camera': '开启摄像头加入', 'Expand call': '展开通话',
+    'Hide the call view': '隐藏通话视图', 'Show the call view': '显示通话视图',
+    'No one in call': '通话中暂无他人',
+    'Join a voice channel to choose a camera.': '加入语音频道后可选择摄像头。',
+    'Could not create the image preview.': '无法生成图片预览。',
   };
   // <option> labels (settings and menus)
   const OPT = {
@@ -157,9 +163,9 @@
 
   // ---------------------------------------------------------------- patterns (whole string)
   const R = [
-    [/^Message #(.+)$/, '在 #$1 中发消息'], [/^Message @(.+)$/, '发消息给 @$1'],
-    [/^Welcome to #(.+)!$/, '欢迎来到 #$1！'],
-    [/^This is the start of the #(.+) channel\. Messages travel peer-to-peer; people who join later get recent history from whoever is online\.$/, '这里是 #$1 频道的开端。消息点对点传输，后来加入的人会从在线成员那里同步最近的聊天记录。'],
+    [/^Message (.+)$/, '在 $1 中发消息'], [/^Message @(.+)$/, '发消息给 @$1'],
+    [/^Welcome to (.+)!$/, '欢迎来到 $1！'],
+    [/^This is the start of the (.+) channel\. Messages travel peer-to-peer; people who join later get recent history from whoever is online\.$/, '这里是 $1 频道的开端。消息点对点传输，后来加入的人会从在线成员那里同步最近的聊天记录。'],
     [/^This is the start of your direct messages with (.+)\. They go straight from your device to theirs; messages sent while one of you is offline arrive the next time you are both online\.$/, '这是你与 $1 私信的开端。消息直接从你的设备发送到对方设备；一方离线时发送的消息会在双方都在线时送达。'],
     [/^(Online|Offline) · only the two of you can see this$/, (m, a) => (a === 'Online' ? '在线' : '离线') + ' · 仅你们两人可见'],
     [/^Today at (.+)$/, '今天 $1'], [/^Yesterday at (.+)$/, '昨天 $1'],
@@ -169,6 +175,8 @@
     [/^is typing…$/, '正在输入…'], [/^are typing…$/, '正在输入…'],
     [/^Online — (\d+)$/, '在线 — $1'], [/^Offline — (\d+)$/, '离线 — $1'],
     [/^(\d+) others? online$/, '另有 $1 人在线'],
+    [/^(\d+) (?:person|people) in call$/, '$1 人正在通话'],
+    [/^(\d+) (?:person|people)$/, '$1 人'],
     [/^Auto · (.+)$/, '自动 · $1'], [/^Auto$/, '自动'], [/^Up to (.+)$/, '最高 $1'],
     [/^No ping reply from (.+) yet$/, '尚未收到 $1 的延迟响应'], [/^Ping to (.+): (\d+) ms$/, '到 $1 的延迟：$2 ms'],
     [/^Loading image… (\d+)%$/, '图片加载中… $1%'], [/^Downloading (\d+)%$/, '下载中 $1%'],
@@ -181,6 +189,7 @@
     [/^Invite friends to (.+)$/, '邀请好友加入 $1'], [/^Joined (.+)$/, '已加入 $1'], [/^Leave '(.+)'$/, '退出「$1」'],
     [/^Delete (#?)(.+) for everyone\?$/, '要为所有人删除 $1$2 吗？'], [/^Mention (.+)$/, '提及 $1'], [/^Removed (\d+) (person|people)$/, '已移除 $1 人'],
     [/^Removed (.+)$/, '已移除 $1'], [/^Removing (.+) from the call$/, '正在将 $1 移出通话'], [/^Moving (.+) to (.+)$/, '正在将 $1 移到 $2'],
+    [/^(.+) removed you from the call$/, '$1 已将你移出通话'], [/^(.+) moved you to (.+)$/, '$1 已将你移到 $2'],
     [/^(.+)'s app did not respond\. They may need to reload the page\.$/, '$1 的应用没有响应，对方可能需要刷新页面。'],
     [/^(.+) is on an older version of 咚咚 and can't (.+) until they reload the page\.$/, '$1 使用的是旧版咚咚，刷新页面前无法执行该操作。'],
     [/^Remove (\d+) offline (person|people) from the member list\? Their messages stay, and anyone who comes back online is listed again\.$/, '要从成员列表中移除 $1 位离线成员吗？他们的消息会保留，重新上线后会再次显示。'],
