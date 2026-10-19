@@ -1,0 +1,48 @@
+name: Build Desktop (Windows ZIP)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'desktop/**'
+      - 'index.html'
+      - 'app.js'
+      - 'style.css'
+      - 'zh.js'
+      - 'file-transfer.js'
+      - 'image-preview.js'
+      - 'screen-quality.js'
+      - 'demo-select.js'
+      - 'rnnoise/**'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Sync web app into desktop shell
+        working-directory: desktop
+        run: npm run sync-app
+
+      - name: Build Windows ZIP package
+        working-directory: desktop
+        run: npm run build:win
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DingDong-Windows-${{ github.run_number }}
+          path: desktop/release/DingDong-Windows.zip
+          if-no-files-found: error
