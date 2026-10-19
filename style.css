@@ -259,15 +259,39 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 /* Voice */
-#voiceView { align-items: center; justify-content: center; background: #000; }
-#voiceIdle { text-align: center; color: var(--text-muted); padding: 24px; }
-.vi-icon { width: 72px; height: 72px; border-radius: 50%; background: #2b2d31; display: grid; place-items: center; margin: 0 auto 8px; color: var(--text); }
-.vi-icon .ico-svg { width: 36px; height: 36px; }
-#voiceIdle h2 { color: var(--text-strong); margin: 8px 0; }
-.vi-people { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin: 16px 0 4px; }
-.vi-person { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text); font-weight: 600; }
-.vi-person.speaking .avatar { box-shadow: 0 0 0 3px #000, 0 0 0 6px var(--green); }
+/* Merged channels: the call dock lives above the composer inside #textView */
+#callDock { margin-bottom: 8px; border-radius: var(--radius); background: #1e1f22; border: 1px solid #2b2d31; padding: 8px 10px; }
+#dockIdle { display: flex; align-items: center; gap: 10px; min-width: 0; }
+#dockIdle .di-ico { display: grid; place-items: center; color: var(--green); flex: none; }
+#dockIdle .di-ico .ico-svg { width: 18px; height: 18px; }
+#dockIdleText { flex: 1; min-width: 0; color: var(--text-muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.sm { padding: 6px 10px; font-size: 13px; gap: 6px; }
+.btn.sm .ico-svg { width: 15px; height: 15px; }
+#dockLive { display: flex; align-items: center; gap: 10px; cursor: pointer; min-width: 0; }
+#dockLive .dl-ico { display: grid; place-items: center; color: var(--green); flex: none; }
+#dockLive .dl-ico .ico-svg { width: 18px; height: 18px; }
+.dl-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dl-info b { color: var(--text-strong); font-size: 13px; }
+.dl-info span { color: var(--text-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#dockExpand .ico-svg { transform: rotate(180deg); } /* chevron points up = show/hide the call view */
+#dockExpand.on .ico-svg { transform: none; }        /* points down when the call view is shown */
+.welcome-note { margin-top: 14px; font-size: 13px; opacity: .85; }
+/* In-call split layout: the call stage docks on top, chat keeps flowing below it. */
+body.in-this-call #main { padding-top: var(--call-h, 260px); }
+body.in-this-call #voiceStage {
+  position: absolute; top: 0; left: 0; right: 0; height: var(--call-h, 260px);
+  bottom: auto; border-bottom: 1px solid #2b2d31; z-index: 4;
+}
+body.in-this-call #tiles { inset: 0 0 64px 0; padding: 8px; gap: 8px; }
+body.in-this-call #callBar { height: 64px; }
+body.in-this-call .call-btn { width: 44px; height: 44px; }
+body.in-this-call .call-btn .ico-svg { width: 20px; height: 20px; }
+@media (max-width: 700px) {
+  body.in-this-call #main { padding-top: min(42vh, 240px); }
+  body.in-this-call #voiceStage { height: min(42vh, 240px); }
+}
 
+body.call-full #voiceStage { top: 0; } /* legacy: takeover layout replaced by the split view */
 #voiceStage { position: absolute; top: 48px; left: 0; right: 0; bottom: 0; background: #000; overflow: hidden; }
 #voiceStage.offstage { visibility: hidden; pointer-events: none; }
 #voiceStage.offstage * { visibility: hidden !important; }
@@ -818,8 +842,6 @@ body.resizing iframe { pointer-events: none !important; }
   #welcome { padding: 20px; overflow-y: auto; justify-content: safe center; }
   .welcome-logo { width: 64px; height: 64px; }
   .welcome-card h1 { font-size: 25px; }
-  #voiceIdle { padding: 16px; max-height: 100%; overflow-y: auto; }
-  .vi-people { gap: 16px; }
   #messages { padding-top: 4px; overscroll-behavior-y: contain; }
   .msg { gap: 10px; padding: 3px max(12px, var(--safe-area-inset-right)) 3px max(10px, var(--safe-area-inset-left)); }
   .msg .gutter { width: 32px; }
