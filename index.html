@@ -33,8 +33,7 @@
         <button id="serverMenuBtn" class="icon-btn" title="Server options"><i data-icon="chevron"></i></button>
         <div id="serverMenu" class="menu hidden">
           <button data-act="invite"><i data-icon="userPlus"></i>Invite people</button>
-          <button data-act="addText"><i data-icon="hash"></i>Create text channel</button>
-          <button data-act="addVoice"><i data-icon="speaker"></i>Create voice channel</button>
+          <button data-act="addChannel"><i data-icon="hash"></i>Create channel</button>
           <button data-act="rename"><i data-icon="edit"></i>Rename server</button>
           <button data-act="leave" class="danger"><i data-icon="logout"></i>Leave server</button>
         </div>
@@ -80,7 +79,8 @@
         <div class="spacer"></div>
         <button class="icon-btn" id="searchTop" title="Search messages (Ctrl+F)"><i data-icon="search"></i></button>
         <button class="icon-btn" id="inviteTop" title="Invite people"><i data-icon="userPlus"></i></button>
-        <button class="icon-btn" id="membersToggle" title="Member list"><i data-icon="users"></i></button>
+          <button class="icon-btn" id="membersToggle" title="Member list"><i data-icon="users"></i></button>
+          <button class="icon-btn hidden" id="headerCallBtn" title="Back to call"><i data-icon="speaker"></i></button>
       </header>
 
       <section id="welcome" class="view">
@@ -92,6 +92,7 @@
             <button class="btn primary" id="wCreate">Create a server</button>
             <button class="btn" id="wJoin">Join with invite link</button>
           </div>
+          <p class="welcome-note">文字与语音已合并为同一频道：在任意频道里既能聊天，也能一键发起或加入通话。</p>
         </div>
       </section>
 
@@ -99,6 +100,22 @@
         <div id="messages"></div>
         <div id="typing"></div>
         <form id="composer" autocomplete="off">
+          <!-- Merged channels: the call lives in this dock above the composer; expand it for video -->
+          <div id="callDock" class="hidden">
+            <div id="dockIdle">
+              <span class="di-ico"><i data-icon="speaker"></i></span>
+              <span id="dockIdleText"></span>
+              <button class="btn green sm" id="dockJoin"><i data-icon="mic"></i>Join voice</button>
+              <button class="btn sm" id="dockCam"><i data-icon="camera"></i>With camera</button>
+            </div>
+            <div id="dockLive" class="hidden">
+              <span class="dl-ico"><i data-icon="signal"></i></span>
+              <div class="dl-info"><b>Voice connected</b><span><span id="dockWho"></span> · <span id="dockTime" title="Time in this call"></span></span></div>
+              <button class="icon-btn" id="dockMic" title="Mute"><i data-icon="mic"></i></button>
+              <button class="icon-btn" id="dockExpand" title="Expand call"><i data-icon="expand"></i></button>
+              <button class="icon-btn danger" id="dockLeave" title="Disconnect"><i data-icon="hangup"></i></button>
+            </div>
+          </div>
           <div id="replyBar" class="hidden" aria-live="polite"></div>
           <div id="attachBar" class="hidden"></div>
           <div id="mentionMenu" class="hidden" role="listbox" aria-label="Mention someone"></div>
@@ -111,18 +128,6 @@
           <input type="file" id="fileInput" multiple hidden>
         </form>
         <div class="drop-hint">Drop files to share on request</div>
-      </section>
-
-      <section id="voiceView" class="view hidden">
-        <div id="voiceIdle">
-          <div class="vi-icon"><i data-icon="speaker"></i></div>
-          <h2 id="voiceIdleTitle"></h2>
-          <div id="voiceIdleWho"></div>
-          <div class="row">
-            <button class="btn green" id="joinVoiceBtn"><i data-icon="mic"></i>Join Voice</button>
-            <button class="btn" id="joinVideoBtn"><i data-icon="camera"></i>Join with Camera</button>
-          </div>
-        </div>
       </section>
 
       <!-- The live VDO.Ninja call lives here and survives switching channels -->
@@ -173,8 +178,8 @@
   <script src="file-transfer.js?v=18"></script>
   <script src="image-preview.js?v=2"></script>
   <script src="screen-quality.js?v=1"></script>
-  <script src="zh.js?v=dd2"></script>
+  <script src="zh.js?v=dd3"></script>
   <script src="demo-select.js?v=dd2"></script>
-  <script src="app.js?v=72"></script>
+  <script src="app.js?v=75"></script>
 </body>
 </html>
