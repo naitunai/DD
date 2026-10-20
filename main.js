@@ -11,19 +11,16 @@ app.on('ready', () => {
  callback(allowed.includes(permission));
  });
 
- // Windows 不支持 useSystemPicker：手动枚举屏幕/窗口源并回传，由系统展示选择 UI
+ // 屏幕捕获：枚举源后回传单个主屏 source（Electron 33 稳定用法）
  ses.setDisplayMediaRequestHandler(async (request, callback) => {
  console.log('[display-media] request from:', request.securityOrigin && request.securityOrigin.host);
  try {
  const sources = await desktopCapturer.getSources({
- types: ['screen', 'window'],
- thumbnailSize: { width: 800, height: 450 },
- fetchWindowIcons: true
+ types: ['screen'],
+ thumbnailSize: { width: 0, height: 0 }
  });
  if (!sources.length) return callback({});
- // 传入 source 数组 → Electron 弹出原生选择器；若你的版本不支持数组，改用下一行注释的单源写法
- callback({ video: sources, audio: 'loopback' });
- // callback({ video: sources[0], audio: 'loopback' }); // 保底：直接共享主屏
+ callback({ video: sources[0], audio: 'loopback' });
  } catch (err) {
  console.error('[display-media] failed:', err);
  callback({});
