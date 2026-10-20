@@ -1,21 +1,34 @@
 name: Build EXE (Nativefier, Chromium)
 on:
-  workflow_dispatch: # ✅ 手动一键运行
+  workflow_dispatch: # 手动一键打包
 jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+
       - name: Install nativefier
         run: npm install -g nativefier
-      - name: Build EXE
-        run: nativefier ./ --name "MyApp" --icon icon.ico --platform windows
-      - name: Upload exe
+
+      - name: Build App
+        run: |
+          nativefier ./ `
+            --name "DD" `
+            --platform windows `
+            --out ./build_output
+        # 如果你仓库根目录没有 icon.ico，就不要加 --icon 参数！有ico再加上：--icon icon.ico `
+
+      - name: 列出打包目录（调试用）
+        run: Get-ChildItem ./build_output -Recurse
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-exe
-          path: "MyApp-win32-x64/**"
+          name: DD-Windows-App
+          path: ./build_output/**
