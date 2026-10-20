@@ -1,0 +1,21 @@
+name: Build EXE (Nativefier, Chromium)
+on:
+  workflow_dispatch: # ✅ 手动一键运行
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install nativefier
+        run: npm install -g nativefier
+      - name: Build EXE
+        run: nativefier ./ --name "MyApp" --icon icon.ico --platform windows
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: "MyApp-win32-x64/**"
