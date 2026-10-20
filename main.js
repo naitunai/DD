@@ -12,6 +12,12 @@ function diag(msg) {
 app.on('ready', () => {
  Menu.setApplicationMenu(null);
 
+ // [关键修复] preload 挂到 defaultSession：让跨域 vdo.ninja iframe 也获得 require/ipcRenderer，
+ // VDO 官网的 Electron 屏幕共享补丁依赖它调 sendSync('getSources')；仅 BrowserWindow.preload 只覆盖顶层页
+ const p0 = require('path');
+ try { session.defaultSession.setPreloadFile(p0.join(__dirname, 'preload.js')); diag('preload -> defaultSession OK'); }
+ catch (e) { diag('setPreloadFile FAIL: ' + e.message); }
+
  const ses = session.defaultSession;
 
  // VDO 的 Electron 补丁用老式 chromeMediaSource:desktop 起流，必须显式放行
@@ -83,10 +89,6 @@ app.on('ready', () => {
  });
  mainWin.webContents.on('render-process-gone', (e, d) => diag('RENDERER GONE: ' + JSON.stringify(d)));
  // [临时取证] 顶层页面里挂钩子，捕获 iframe 加载失败与 JS 异常（error 事件捕获阶段可看到子资源失败）
- // [临时取证] 检查 preload 是否在顶层页面生效
- mainWin.webContents.on('dom-ready', () => {
-   mainWin.webContents.executeJavaScript("(function(){try{return '[dd-probe] require='+(typeof window.require)+' ipcRenderer='+(typeof window.ipcRenderer)}catch(e){return '[dd-probe] err '+e.message}})()").then(r => diag(r)).catch(() => {});
- });
  mainWin.webContents.once('dom-ready', () => {
    const hook = "try{window.addEventListener('error',function(ev){var t=ev.target;if(t&&t.tagName==='IFRAME'){console.error('DDHOOK iframe load fail: '+(t.src||'').slice(0,80))}else if(ev.message){console.error('DDHOOK js: '+ev.message+' @'+String(ev.filename||'').slice(0,50))}},true);}catch(e){}";
    mainWin.webContents.executeJavaScript(hook).catch(() => {});
