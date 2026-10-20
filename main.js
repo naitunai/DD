@@ -13,8 +13,7 @@ app.on('ready', () => {
       contextIsolation: true
     }
   });
-  win.loadURL('https://naitunai.github.io/DD/');
-
-  // 临时诊断：打开 DevTools，看 Console 里点击时是否报安全错误
-  win.webContents.openDevTools();
-});
+  // 允许页面弹窗，并把它们作为新窗口打开
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    return { action: 'allow' };
+  });
