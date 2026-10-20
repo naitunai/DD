@@ -1,9 +1,9 @@
 name: Build Windows EXE
 
 on:
-  workflow_dispatch:          # 手动触发
+  workflow_dispatch:
   push:
-    tags: ['v*']              # 打 v1.0.0 这类标签自动触发并发布
+    tags: ['v*']
 
 jobs:
   build:
@@ -13,7 +13,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install
