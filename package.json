@@ -1,0 +1,23 @@
+{
+  "name": "dd-desktop",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "io.github.naitunai.dd",
+    "productName": "咚咚",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "index.html", "**/*"],
+    "win": {
+      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "signAndEditExecutable": false
+    }
+  }
+}
