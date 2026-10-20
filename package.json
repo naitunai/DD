@@ -1,34 +1,35 @@
 {
-  "name": "dd-desktop",
-  "version": "1.0.0",
-  "description": "咚咚桌面版",
-  "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "build": "electron-builder --win --x64 --publish never"
-  },
-  "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
-  },
-  "build": {
-    "appId": "io.github.naitunai.dd",
-    "productName": "咚咚",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "package.json"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "portable",
-          "arch": ["x64"]
-        }
-      ],
-      "signAndEditExecutable": false
-    }
-  }
+ "name": "dd-desktop",
+ "version": "1.0.0",
+ "description": "咚咚桌面版",
+ "main": "main.js",
+ "scripts": {
+ "start": "electron .",
+ "build": "electron-builder --win --x64 --publish never"
+ },
+ "devDependencies": {
+ "electron": "^33.0.0",
+ "electron-builder": "^25.0.0"
+ },
+ "build": {
+ "appId": "io.github.naitunai.dd",
+ "productName": "咚咚",
+ "directories": {
+ "output": "dist"
+ },
+ "files": [
+ "main.js",
+ "preload.js",
+ "package.json"
+ ],
+ "win": {
+ "target": [
+ {
+ "target": "portable",
+ "arch": ["x64"]
+ }
+ ],
+ "signAndEditExecutable": false
+ }
+ }
 }
