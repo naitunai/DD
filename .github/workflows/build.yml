@@ -1,12 +1,12 @@
-name: Build EXE (Nativefier, Chromium)
+name: Build DD EXE (Nativefier Chromium)
 on:
-  workflow_dispatch: # 手动一键打包
+  workflow_dispatch:
+
 jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
@@ -16,19 +16,19 @@ jobs:
       - name: Install nativefier
         run: npm install -g nativefier
 
-      - name: Build App
+      - name: Build from online url
         run: |
-          nativefier ./ `
-            --name "DD" `
+          nativefier "https://naitunai.github.io/DD/" `
+            --name "咚咚" `
             --platform windows `
-            --out ./build_output
-        # 如果你仓库根目录没有 icon.ico，就不要加 --icon 参数！有ico再加上：--icon icon.ico `
+            --out ./build_output `
+            --disable-context-menu
 
-      - name: 列出打包目录（调试用）
+      - name: Show generated files
         run: Get-ChildItem ./build_output -Recurse
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DD-Windows-App
+          name: DD-Windows-package
           path: ./build_output/**
