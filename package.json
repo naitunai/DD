@@ -1,6 +1,7 @@
 {
   "name": "dd-desktop",
   "version": "1.0.0",
+  "description": "咚咚桌面版",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -13,10 +14,20 @@
   "build": {
     "appId": "io.github.naitunai.dd",
     "productName": "咚咚",
-    "directories": { "output": "dist" },
-    "files": ["main.js", "index.html", "**/*"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
       "signAndEditExecutable": false
     }
   }
