@@ -71,6 +71,27 @@ app.on('ready', () => {
  });
  mainWin.webContents.on('did-fail-load', (e, code, desc, url) => diag('page load fail: ' + code + ' ' + url));
 
+ // [临时取证] 子 frame 导航/加载情况：确认 vdo.ninja iframe 是否真的加载成功
+ mainWin.webContents.on('did-frame-load-start', (e, frameId, isMain, url) => {
+   if (!isMain) diag('frame start: ' + String(url).slice(0, 90));
+ });
+ mainWin.webContents.on('did-frame-navigate', (e, url) => {
+   if (/vdo\.ninja/.test(String(url))) diag('vdo frame nav: ' + String(url).slice(0, 90));
+ });
+ mainWin.webContents.on('did-frame-finish-load', (e, isMain, p) => {
+   if (!isMain) diag('frame finish: ' + String(p).slice(0, 90));
+ });
+ mainWin.webContents.on('render-process-gone', (e, d) => diag('RENDERER GONE: ' + JSON.stringify(d)));
+ // [临时取证] 顶层页面里挂钩子，捕获 iframe 加载失败与 JS 异常（error 事件捕获阶段可看到子资源失败）
+ // [临时取证] 检查 preload 是否在顶层页面生效
+ mainWin.webContents.on('dom-ready', () => {
+   mainWin.webContents.executeJavaScript("(function(){try{return '[dd-probe] require='+(typeof window.require)+' ipcRenderer='+(typeof window.ipcRenderer)}catch(e){return '[dd-probe] err '+e.message}})()").then(r => diag(r)).catch(() => {});
+ });
+ mainWin.webContents.once('dom-ready', () => {
+   const hook = "try{window.addEventListener('error',function(ev){var t=ev.target;if(t&&t.tagName==='IFRAME'){console.error('DDHOOK iframe load fail: '+(t.src||'').slice(0,80))}else if(ev.message){console.error('DDHOOK js: '+ev.message+' @'+String(ev.filename||'').slice(0,50))}},true);}catch(e){}";
+   mainWin.webContents.executeJavaScript(hook).catch(() => {});
+ });
+
  mainWin.webContents.setWindowOpenHandler(({ url }) => ({ action: 'allow' }));
  mainWin.loadURL('https://naitunai.github.io/DD/');
  mainWin.webContents.on('dom-ready', () => diag('shell ready: diag mode ON'));
