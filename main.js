@@ -9,14 +9,31 @@ function diag(msg) {
  mainWin.webContents.executeJavaScript(js).catch(() => {});
 }
 
+// 注入进 vdo.ninja iframe 的桥接脚本（executeJavaScript 跑在页面主世界）：
+// 覆写 navigator.mediaDevices.getDisplayMedia —— VDO 官网的 Electron 补丁会先覆写它一次，
+// 但本脚本在 frame finish-load 之后注入、且用微任务重试包裹，保证最终生效的是这个"走主进程预取源"的版本。
+// 屏幕源列表由主进程 desktopCapturer.getSources() 预取后以 window.__ddPrefetched 注入（含合法 source id）。
+const DD_BRIDGE = "(function(){try{" +
+ "if(window.__ddBridgeV1)return'cached';window.__ddBridgeV1=1;" +
+ "function req(){return new Promise(function(res,rej){var t=setInterval(function(){" +
+ "if(window.__ddPrefetched&&window.__ddPrefetched.length){clearInterval(t);res(window.__ddPrefetched)}" +
+ "},50);setTimeout(function(){clearInterval(t);rej(new Error('dd prefetch empty'))},9000)})}" +
+ "window.ddGetSources=req;" +
+ "var md=navigator.mediaDevices;if(!md)return'no mediaDevices';" +
+ "md.getDisplayMedia=function(constraints){" +
+ " return req().then(function(sources){" +
+ "  var src=sources[0];" +
+ "  var g={audio:false,video:{mandatory:{chromeMediaSource:'desktop',chromeMediaSourceId:src.id}}};" +
+ "  try{if(constraints&&constraints.video&&constraints.video.width&&constraints.video.width.ideal)g.video.mandatory.maxWidth=constraints.video.width.ideal}catch(e){}" +
+ "  try{if(constraints&&constraints.video&&constraints.video.height&&constraints.video.height.ideal)g.video.mandatory.maxHeight=constraints.video.height.ideal}catch(e){}" +
+ "  try{if(constraints&&constraints.video&&constraints.video.frameRate&&constraints.video.frameRate.ideal)g.video.mandatory.maxFrameRate=constraints.video.frameRate.ideal}catch(e){}" +
+ "  return md.getUserMedia(g);" +
+ " });" +
+ "};" +
+ "console.log('[dd-bridge] getDisplayMedia proxied');" +
+ "return 'injected'}catch(e){return 'err '+e}})()";
 app.on('ready', () => {
  Menu.setApplicationMenu(null);
-
- // [关键修复] preload 挂到 defaultSession：让跨域 vdo.ninja iframe 也获得 require/ipcRenderer，
- // VDO 官网的 Electron 屏幕共享补丁依赖它调 sendSync('getSources')；仅 BrowserWindow.preload 只覆盖顶层页
- const p0 = require('path');
- try { session.defaultSession.setPreloadFile(p0.join(__dirname, 'preload.js')); diag('preload -> defaultSession OK'); }
- catch (e) { diag('setPreloadFile FAIL: ' + e.message); }
 
  const ses = session.defaultSession;
 
@@ -84,6 +101,23 @@ app.on('ready', () => {
  mainWin.webContents.on('did-frame-navigate', (e, url) => {
    if (/vdo\.ninja/.test(String(url))) diag('vdo frame nav: ' + String(url).slice(0, 90));
  });
+ // [核心] vdo iframe 一开始加载就注入桥接 + 预取屏幕源（比 finish-load 更早，抢在站点逻辑前生效）
+ mainWin.webContents.on('did-frame-load-start', (e, frameId, isMain, url) => {
+   if (isMain || !/vdo\.ninja/.test(String(url || ''))) return;
+   setTimeout(() => {
+     try {
+       const frames = mainWin.webContents.mainFrame.framesInSubtree;
+       for (const fr of frames) {
+         if (!/vdo\.ninja/.test(fr.url || '')) continue;
+         fr.executeJavaScript(DD_BRIDGE, true).then(r => diag('vdo bridge: ' + r)).catch(err => diag('vdo bridge FAIL: ' + err.message));
+         desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }).then(sources => {
+           const js = 'window.__ddPrefetched=' + JSON.stringify(sources.map(x => ({ id: x.id, name: x.name }))) + ';';
+           return fr.executeJavaScript(js, true);
+         }).then(() => diag('prefetch injected')).catch(err => diag('prefetch FAIL: ' + err.message));
+       }
+     } catch (err) { diag('bridge scan err: ' + err.message); }
+   }, 300);
+ });
  mainWin.webContents.on('did-frame-finish-load', (e, isMain, p) => {
    if (!isMain) diag('frame finish: ' + String(p).slice(0, 90));
  });
@@ -96,5 +130,5 @@ app.on('ready', () => {
 
  mainWin.webContents.setWindowOpenHandler(({ url }) => ({ action: 'allow' }));
  mainWin.loadURL('https://naitunai.github.io/DD/');
- mainWin.webContents.on('dom-ready', () => diag('shell ready: diag mode ON'));
+ mainWin.webContents.on('dom-ready', () => diag('shell ready: diag mode v13 (bridge)'));
 });
