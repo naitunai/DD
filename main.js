@@ -101,22 +101,36 @@ app.on('ready', () => {
  mainWin.webContents.on('did-frame-navigate', (e, url) => {
    if (/vdo\.ninja/.test(String(url))) diag('vdo frame nav: ' + String(url).slice(0, 90));
  });
- // [核心] vdo iframe 一开始加载就注入桥接 + 预取屏幕源（比 finish-load 更早，抢在站点逻辑前生效）
- mainWin.webContents.on('did-frame-load-start', (e, frameId, isMain, url) => {
-   if (isMain || !/vdo\.ninja/.test(String(url || ''))) return;
-   setTimeout(() => {
+ // [核心] 任何子 frame 开始加载就启动"桥接注入重试循环"：
+ // load-start 时 frame 还没提交、fr.url 仍是旧值，必须轮询等它导航到 vdo.ninja 再注入（每 250ms×40 次≈10s）
+ function bridgeLoop(wc) {
+   if (wc.__ddLooping) return; wc.__ddLooping = true;
+   let tries = 0;
+   const tick = () => {
+     if (wc.isDestroyed() || ++tries > 40) { wc.__ddLooping = false; return; }
+     let alive = false;
      try {
-       const frames = mainWin.webContents.mainFrame.framesInSubtree;
-       for (const fr of frames) {
+       for (const fr of wc.mainFrame.framesInSubtree) {
          if (!/vdo\.ninja/.test(fr.url || '')) continue;
-         fr.executeJavaScript(DD_BRIDGE, true).then(r => diag('vdo bridge: ' + r)).catch(err => diag('vdo bridge FAIL: ' + err.message));
+         alive = true;
+         if (fr.__ddDone) continue;
+         fr.__ddDone = true;
+         diag('bridge target hit @try' + tries + ': ' + String(fr.url).slice(0, 60));
+         fr.executeJavaScript(DD_BRIDGE, true).then(r => diag('vdo bridge: ' + r)).catch(err => { fr.__ddDone = false; diag('vdo bridge FAIL: ' + err.message); });
          desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }).then(sources => {
+           diag('sources ready: ' + sources.length);
            const js = 'window.__ddPrefetched=' + JSON.stringify(sources.map(x => ({ id: x.id, name: x.name }))) + ';';
            return fr.executeJavaScript(js, true);
          }).then(() => diag('prefetch injected')).catch(err => diag('prefetch FAIL: ' + err.message));
        }
-     } catch (err) { diag('bridge scan err: ' + err.message); }
-   }, 300);
+     } catch (err) { diag('bridge loop err: ' + err.message); }
+     if (!alive) { wc.__ddLooping = false; return; } // 所有 vdo frame 已处理完则停；否则继续轮询新出现的
+     setTimeout(tick, 250);
+   };
+   setTimeout(tick, 120);
+ }
+ mainWin.webContents.on('did-frame-load-start', (e, frameId, isMain, url) => {
+   if (!isMain) bridgeLoop(mainWin.webContents);
  });
  mainWin.webContents.on('did-frame-finish-load', (e, isMain, p) => {
    if (!isMain) diag('frame finish: ' + String(p).slice(0, 90));
@@ -130,5 +144,5 @@ app.on('ready', () => {
 
  mainWin.webContents.setWindowOpenHandler(({ url }) => ({ action: 'allow' }));
  mainWin.loadURL('https://naitunai.github.io/DD/');
- mainWin.webContents.on('dom-ready', () => diag('shell ready: diag mode v13 (bridge)'));
+ mainWin.webContents.on('dom-ready', () => diag('shell ready: diag mode v14 (retry-bridge)'));
 });
