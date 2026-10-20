@@ -14,23 +14,36 @@ function diag(msg) {
 // 但本脚本在 frame finish-load 之后注入、且用微任务重试包裹，保证最终生效的是这个"走主进程预取源"的版本。
 // 屏幕源列表由主进程 desktopCapturer.getSources() 预取后以 window.__ddPrefetched 注入（含合法 source id）。
 const DD_BRIDGE = "(function(){try{" +
- "if(window.__ddBridgeV1)return'cached';window.__ddBridgeV1=1;" +
+ "window.__ddBridgeV1=1;" +
+ "var md=navigator.mediaDevices;if(!md)return'no mediaDevices';" +
  "function req(){return new Promise(function(res,rej){var t=setInterval(function(){" +
  "if(window.__ddPrefetched&&window.__ddPrefetched.length){clearInterval(t);res(window.__ddPrefetched)}" +
- "},50);setTimeout(function(){clearInterval(t);rej(new Error('dd prefetch empty'))},9000)})}" +
+ "},100);setTimeout(function(){clearInterval(t);rej(new Error('dd prefetch empty'))},15000)})}" +
  "window.ddGetSources=req;" +
- "var md=navigator.mediaDevices;if(!md)return'no mediaDevices';" +
- "md.getDisplayMedia=function(constraints){" +
+ "function buildG(sources,constraints){" +
+ " var src=sources[0];" +
+ " var g={audio:false,video:{mandatory:{chromeMediaSource:'desktop',chromeMediaSourceId:src.id}}};" +
+ " try{if(constraints&&constraints.video&&constraints.video.width&&constraints.video.width.ideal)g.video.mandatory.maxWidth=constraints.video.width.ideal}catch(e){}" +
+ " try{if(constraints&&constraints.video&&constraints.video.height&&constraints.video.height.ideal)g.video.mandatory.maxHeight=constraints.video.height.ideal}catch(e){}" +
+ " try{if(constraints&&constraints.video&&constraints.video.frameRate&&constraints.video.frameRate.ideal)g.video.mandatory.maxFrameRate=constraints.video.frameRate.ideal}catch(e){}" +
+ " return g}" +
+ " function patched(constraints){" +
+ " console.log('[dd-bridge] getDisplayMedia CALLED');" +
  " return req().then(function(sources){" +
- "  var src=sources[0];" +
- "  var g={audio:false,video:{mandatory:{chromeMediaSource:'desktop',chromeMediaSourceId:src.id}}};" +
- "  try{if(constraints&&constraints.video&&constraints.video.width&&constraints.video.width.ideal)g.video.mandatory.maxWidth=constraints.video.width.ideal}catch(e){}" +
- "  try{if(constraints&&constraints.video&&constraints.video.height&&constraints.video.height.ideal)g.video.mandatory.maxHeight=constraints.video.height.ideal}catch(e){}" +
- "  try{if(constraints&&constraints.video&&constraints.video.frameRate&&constraints.video.frameRate.ideal)g.video.mandatory.maxFrameRate=constraints.video.frameRate.ideal}catch(e){}" +
- "  return md.getUserMedia(g);" +
- " });" +
- "};" +
- "console.log('[dd-bridge] getDisplayMedia proxied');" +
+ "  var g=buildG(sources,constraints);" +
+ "  return md.getUserMedia(g).catch(function(e1){" +
+ "   console.warn('[dd-bridge] gum fail:'+(e1&&e1.message)+', retry plain');" +
+ "   return md.getUserMedia({video:{mandatory:{chromeMediaSource:'desktop',chromeMediaSourceId:sources[0].id}},audio:false});" +
+ "  });" +
+ " }).then(function(stream){console.log('[dd-bridge] stream ok, tracks:'+stream.getTracks().length);return stream})" +
+ "  .catch(function(e){console.error('[dd-bridge] final fail:'+(e&&e.message));throw e});" +
+ "}" +
+ "var asserting=true,guard=0;" +
+ "function reassert(){" +
+ " if(++guard>400||!asserting)return;" +
+ " try{if(md.getDisplayMedia!==patched){md.getDisplayMedia=patched;console.log('[dd-bridge] asserted')}}catch(e){}" +
+ " setTimeout(reassert,200)}" +
+ "reassert();" +
  "return 'injected'}catch(e){return 'err '+e}})()";
 app.on('ready', () => {
  Menu.setApplicationMenu(null);
@@ -117,11 +130,14 @@ app.on('ready', () => {
          fr.__ddDone = true;
          diag('bridge target hit @try' + tries + ': ' + String(fr.url).slice(0, 60));
          fr.executeJavaScript(DD_BRIDGE, true).then(r => diag('vdo bridge: ' + r)).catch(err => { fr.__ddDone = false; diag('vdo bridge FAIL: ' + err.message); });
-         desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }).then(sources => {
-           diag('sources ready: ' + sources.length);
+         const pushSources = (tag) => desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }).then(sources => {
+           diag('sources ready@' + tag + ': ' + sources.length);
            const js = 'window.__ddPrefetched=' + JSON.stringify(sources.map(x => ({ id: x.id, name: x.name }))) + ';';
            return fr.executeJavaScript(js, true);
-         }).then(() => diag('prefetch injected')).catch(err => diag('prefetch FAIL: ' + err.message));
+         }).then(() => diag('prefetch injected@' + tag)).catch(err => diag('prefetch FAIL@' + tag + ': ' + err.message));
+         pushSources('t0');
+         setTimeout(() => pushSources('t3'), 3000);
+         setTimeout(() => pushSources('t8'), 8000);
        }
      } catch (err) { diag('bridge loop err: ' + err.message); }
      setTimeout(tick, 250); // 无论本轮是否命中都续跑到上限，避免 frame 注册延迟导致的早退
@@ -153,5 +169,5 @@ app.on('ready', () => {
 
  mainWin.webContents.setWindowOpenHandler(({ url }) => ({ action: 'allow' }));
  mainWin.loadURL('https://naitunai.github.io/DD/');
- mainWin.webContents.on('dom-ready', () => diag('shell ready: diag mode v15 (nav-bridge)'));
+ mainWin.webContents.on('dom-ready', () => diag('shell ready: diag mode v16 (assert-bridge)'));
 });
