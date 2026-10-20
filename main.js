@@ -124,12 +124,21 @@ app.on('ready', () => {
          }).then(() => diag('prefetch injected')).catch(err => diag('prefetch FAIL: ' + err.message));
        }
      } catch (err) { diag('bridge loop err: ' + err.message); }
-     if (!alive) { wc.__ddLooping = false; return; } // 所有 vdo frame 已处理完则停；否则继续轮询新出现的
-     setTimeout(tick, 250);
+     setTimeout(tick, 250); // 无论本轮是否命中都续跑到上限，避免 frame 注册延迟导致的早退
    };
    setTimeout(tick, 120);
  }
+ // [取证] load-start 是否触发（v14 实测未触发，保留观察）
  mainWin.webContents.on('did-frame-load-start', (e, frameId, isMain, url) => {
+   diag('LS@' + String(url).slice(0, 60));
+   if (!isMain) bridgeLoop(mainWin.webContents);
+ });
+ // [核心] 子 frame 导航到 vdo.ninja 的瞬间就开轮询注入（此事件已验证可靠触发）
+ mainWin.webContents.on('did-frame-navigate', (e, url) => {
+   if (/vdo\.ninja/.test(String(url || ''))) bridgeLoop(mainWin.webContents);
+ });
+ // [兜底] frame 加载完成后再来一轮，防止导航时机仍错过
+ mainWin.webContents.on('did-frame-finish-load', (e, isMain) => {
    if (!isMain) bridgeLoop(mainWin.webContents);
  });
  mainWin.webContents.on('did-frame-finish-load', (e, isMain, p) => {
@@ -144,5 +153,5 @@ app.on('ready', () => {
 
  mainWin.webContents.setWindowOpenHandler(({ url }) => ({ action: 'allow' }));
  mainWin.loadURL('https://naitunai.github.io/DD/');
- mainWin.webContents.on('dom-ready', () => diag('shell ready: diag mode v14 (retry-bridge)'));
+ mainWin.webContents.on('dom-ready', () => diag('shell ready: diag mode v15 (nav-bridge)'));
 });
