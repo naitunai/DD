@@ -12,4 +12,13 @@ app.on('ready', () => {
     }
   });
 
-  win.webContents.setWindow
+  win.webContents.on('did-fail-load', (e, code, desc, url) => {
+    console.log('[did-fail-load]', code, desc, url);
+  });
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    return { action: 'allow' };
+  });
+
+  win.loadURL('https://naitunai.github.io/DD/');
+});
