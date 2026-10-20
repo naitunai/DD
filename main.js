@@ -14,4 +14,7 @@ app.on('ready', () => {
     }
   });
   win.loadURL('https://naitunai.github.io/DD/');
+
+  // 临时诊断：打开 DevTools，看 Console 里点击时是否报安全错误
+  win.webContents.openDevTools();
 });
