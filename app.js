@@ -3716,8 +3716,7 @@ function joinVoice(sid, cid, withCam) {
     };
   }
 
-  function renderVoiceIdle() { /* merged channels: the call dock replaces the old idle voice panel */ }
-
+  
   function fmtTime(ts) { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
   function fmtStamp(ts) {
     const d = new Date(ts), t = new Date();
